@@ -1,4 +1,11 @@
-data/
+# cannot ignore entire data folder if we want to share some files inside it
+data/articles_html/*
+data/articles_plaintext/*
+data/paths-and-graph/*
+!data/paths-and-graph/embedded_articles.npy
+!data/paths-and-graph/similarity_matrix.npy
+*.bin
+.vscode/settings.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
