@@ -9,6 +9,33 @@ def read_articles(file_path='./data/paths-and-graph/articles.tsv'):
 
     return articles
 
+def read_categories(file_path='./data/paths-and-graph/categories.tsv'):
+
+    
+    # Step 1: Load the data
+    categories = pd.read_csv(file_path, sep='\t', comment='#', names=["article", "category"])
+    categories["article"] = categories["article"].apply(unquote).replace('_', ' ', regex=True)
+
+    # Step 2: Separate categories by hierarchical levels
+    # Find the maximum depth by checking the highest number of splits in any category
+    max_depth = categories['category'].str.split('.').map(len).max()
+
+    # Dynamically generate column names based on the max depth
+    category_levels = categories['category'].str.split('.', expand=True)
+    category_levels.columns = [f'level_{i+1}' for i in range(max_depth)]
+
+    # Concatenate the levels with the original DataFrame
+    df_expanded = pd.concat([categories, category_levels], axis=1)
+
+    # Check if level_1 has only one unique value and adjust accordingly, 
+    # by removing the column and renaming the rest
+    level_1_values = df_expanded['level_1'].unique()
+    if len(level_1_values) == 1:
+        df_expanded.drop(columns='level_1', inplace=True)
+        df_expanded.columns = ['article', 'category'] + [f'level_{i}' for i in range(1, max_depth)]
+
+    return df_expanded
+
 def read_links(file_path='./data/paths-and-graph/links.tsv'):
 
     links = pd.read_csv(file_path, sep='\t', comment='#', names=["linkSource", "linkTarget"])
