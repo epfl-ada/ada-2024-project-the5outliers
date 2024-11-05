@@ -1,6 +1,5 @@
 from FlagEmbedding import BGEM3FlagModel
 from gensim.models import KeyedVectors
-import pandas as pd
 import numpy as np
 import networkx as nx
 import os
