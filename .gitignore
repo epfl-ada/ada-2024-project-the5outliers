@@ -2,6 +2,14 @@
 __pycache__/
 *.py[cod]
 *$py.class
+data/articles_html/*
+data/articles_plaintext/*
+data/paths-and-graph/*
+!data/paths-and-graph/embedded_articles.npy
+!data/paths-and-graph/similarity_matrix.npy
+*.bin
+.vscode/settings.json
+
 
 # C extensions
 *.so
