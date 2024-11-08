@@ -74,6 +74,8 @@ def read_unfinished_paths(file_path='./data/paths-and-graph/paths_unfinished.tsv
     df = pd.read_csv(file_path, sep='\t', comment='#', names=column_names)
 
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
+    df['path'] = df['path'].apply(unquote).replace('_', ' ', regex=True)
+
 
     return df
 
@@ -83,5 +85,6 @@ def read_finished_paths(file_path='./data/paths-and-graph/paths_finished.tsv'):
     df = pd.read_csv(file_path, sep='\t', comment='#', names=column_names)
 
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
+    df['path'] = df['path'].apply(unquote).replace('_', ' ', regex=True)
 
     return df
