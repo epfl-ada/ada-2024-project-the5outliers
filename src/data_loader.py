@@ -11,7 +11,6 @@ def read_articles(file_path='./data/paths-and-graph/articles.tsv'):
 
 def read_categories(file_path='./data/paths-and-graph/categories.tsv'):
 
-    
     # Step 1: Load the data
     categories = pd.read_csv(file_path, sep='\t', comment='#', names=["article", "category"])
     categories["article"] = categories["article"].apply(unquote).replace('_', ' ', regex=True)
@@ -55,10 +54,10 @@ def read_matrix(file_path='./data/paths-and-graph/shortest-path-distance-matrix.
         stripped_line = line.strip()
         if not stripped_line or stripped_line.startswith('#'):
             continue  # Skip comment lines and empty lines
-        distances = [int(char) if char != '_' else np.nan for char in line.strip()]
+        distances = [int(char) if char != '_' else -1 for char in line.strip()]
         data.append(distances)
 
-    matrix = pd.DataFrame(data)
+    matrix = pd.DataFrame(data, dtype=int)
 
     # Read the articles.tsv file to use as column headers & index
     names_articles = read_articles()
