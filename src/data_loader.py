@@ -126,7 +126,10 @@ class htmlParser:
         '''
             
         with open(filename, 'r') as html_content:
-            soup = BeautifulSoup(html_content, 'html5lib')
+            try:
+                soup = BeautifulSoup(html_content, 'html5lib')
+            except:
+                return None
             # print(soup.prettify()) # nice overview of the article structure
 
             # TITLE
