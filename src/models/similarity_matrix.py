@@ -6,7 +6,7 @@ import os
 
 
 def gensim_embedding(df):
-    '''Gensim word2vec: does not work because takes precise keys as input'''
+    '''Gensim word2vec from article names: does not work for all articles because takes precise keys as input'''
 
     # Load pretrained model
     word2vec = KeyedVectors.load_word2vec_format(r'./data/GoogleNews-vectors-negative300.bin', binary=True)
@@ -19,7 +19,7 @@ def gensim_embedding(df):
     return article_embeddings
 
 def BGEM3_embedding(df):
-    '''BGEM3 embedding: run in colab for speed'''
+    '''BGEM3 embedding from article names: run in colab for speed'''
 
     emb_model = BGEM3FlagModel('BAAI/bge-m3', use_fp16=False) # using fp32 for better precision
     embeddings = emb_model.encode(df.tolist())['dense_vecs']
@@ -40,11 +40,10 @@ def load_embedding_similarity_matrix():
 
     return embeddings, similarity_matrix
 
-def get_indices(df_articles, article_names, reordering_matrix=None):
+def get_indices(df_articles, article_names):
     '''
     Returns the indices of the provided article names in the dataframe of articles. 
     If an article does not exist, the value returned is -1 for that article.
-    TODO: If the similarity matrix if reordered, the reordering matrix for the articles can be provided.
 
     Example of use: indices = sm.get_indices(df_articles, ['cat', 'Dog', 'Cat'])
     '''

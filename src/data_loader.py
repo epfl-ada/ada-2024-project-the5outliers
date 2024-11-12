@@ -7,9 +7,10 @@ from tqdm import tqdm
 import pickle
 
 
-def get_bad_articles(filepath='./data/paths-and-graph/articles.tsv'):
+def get_bad_articles():
     '''Returns the name and index of the articles in articles.tsv that are not wikipedia articles and should be removed.'''
 
+    filepath='./data/paths-and-graph/articles.tsv'
     articles = pd.read_csv(filepath, comment='#', names=["article"])
     articles = articles["article"].apply(unquote).replace('_', ' ', regex=True)
 
@@ -19,12 +20,13 @@ def get_bad_articles(filepath='./data/paths-and-graph/articles.tsv'):
 
     return bad_articles, bad_articles_idx.to_list()
 
-def read_articles(filepath='./data/paths-and-graph/articles.tsv'):
+def read_articles():
     '''
     Return a Series with the article names, with '_' removed and the percent encoding unquoted.
     Removes the articles in the list that are not wikipedia articles.
     '''
 
+    filepath='./data/paths-and-graph/articles.tsv'
     articles = pd.read_csv(filepath, comment='#', names=["article"])
     articles = articles["article"].apply(unquote).replace('_', ' ', regex=True)
     bad_articles, _ = get_bad_articles()
@@ -32,9 +34,10 @@ def read_articles(filepath='./data/paths-and-graph/articles.tsv'):
 
     return articles
 
-def read_categories(filepath='./data/paths-and-graph/categories.tsv'):
+def read_categories():
 
     # Step 1: Load the data
+    filepath='./data/paths-and-graph/categories.tsv'
     categories = pd.read_csv(filepath, sep='\t', comment='#', names=["article", "category"])
     bad_articles, _ = get_bad_articles()
     categories = categories[~categories['article'].isin(bad_articles)].reset_index(drop=True)
@@ -60,9 +63,10 @@ def read_categories(filepath='./data/paths-and-graph/categories.tsv'):
 
     return df_expanded
 
-def read_links(filepath='./data/paths-and-graph/links.tsv'):
+def read_links():
     '''Finds all the existing links between articles, removes invalid articles'''
 
+    filepath='./data/paths-and-graph/links.tsv'
     links = pd.read_csv(filepath, sep='\t', comment='#', names=["linkSource", "linkTarget"])
     bad_articles, _ = get_bad_articles()
     links = links[~links['linkSource'].isin(bad_articles)].reset_index(drop=True)
@@ -72,9 +76,10 @@ def read_links(filepath='./data/paths-and-graph/links.tsv'):
 
     return links
 
-def read_shortest_path_matrix(filepath='./data/paths-and-graph/shortest-path-distance-matrix.txt'):
+def read_shortest_path_matrix():
     '''The rows are the source articles and the columns are the destination articles'''
     
+    filepath='./data/paths-and-graph/shortest-path-distance-matrix.txt'
     with open(filepath, 'r') as file:
         lines = file.readlines()
 
@@ -101,19 +106,21 @@ def read_shortest_path_matrix(filepath='./data/paths-and-graph/shortest-path-dis
 
     return matrix
 
-def read_unfinished_paths(filepath='./data/paths-and-graph/paths_unfinished.tsv'):
+def read_unfinished_paths():
 
-    column_names = ['hashedIpAddress', 'timestamp', 'durationInSec', 'path', 'target', "type"]
+    filepath='./data/paths-and-graph/paths_unfinished.tsv'
+    column_names = ['hashedIpAddress', 'timestamp', 'durationInSec', 'path', 'target', 'type']
     df = pd.read_csv(filepath, sep='\t', comment='#', names=column_names)
 
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
     df['path'] = df['path'].apply(unquote).replace('_', ' ', regex=True)
-
+    df['target'] = df['target'].apply(unquote).replace('_', ' ', regex=True)
 
     return df
 
-def read_finished_paths(filepath='./data/paths-and-graph/paths_finished.tsv'):
+def read_finished_paths():
 
+    filepath='./data/paths-and-graph/paths_finished.tsv'
     column_names = ['hashedIpAddress', 'timestamp', 'durationInSec', 'path', 'rating']
     df = pd.read_csv(filepath, sep='\t', comment='#', names=column_names)
 
@@ -121,6 +128,27 @@ def read_finished_paths(filepath='./data/paths-and-graph/paths_finished.tsv'):
     df['path'] = df['path'].apply(unquote).replace('_', ' ', regex=True)
 
     return df
+
+def read_similartiy_matrix():
+    filepath='./data/paths-and-graph/similarity_matrix.npy'
+    article_names = read_articles()
+    sm = np.load(filepath)
+    df_sm = pd.DataFrame(sm)
+    df_sm.columns = article_names
+    df_sm.index = article_names
+
+    return df_sm
+
+def find_shortest_distance(row, distance_matrix):
+    '''
+    Finds the start and the target of a path and returns the shortest distance between the two.
+    Distance can be anything: shortest path, semantic cosine similarity, ...
+    '''
+    
+    articles = row['path'].split(';')
+    if 'target' in row.index:
+        return distance_matrix.loc[articles[0]][row['target']]
+    return distance_matrix.loc[articles[0]][articles[-1]]
 
 class htmlParser:
     def __init__(self, filepath='./data/articles_html/wp'):
