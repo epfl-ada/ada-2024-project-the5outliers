@@ -42,6 +42,7 @@ def read_categories():
     bad_articles, _ = get_bad_articles()
     categories = categories[~categories['article'].isin(bad_articles)].reset_index(drop=True)
     categories["article"] = categories["article"].apply(unquote).replace('_', ' ', regex=True)
+    categories["category"] = categories["category"].apply(unquote).replace('_', ' ', regex=True)
 
     # Step 2: Separate categories by hierarchical levels
     # Find the maximum depth by checking the highest number of splits in any category
