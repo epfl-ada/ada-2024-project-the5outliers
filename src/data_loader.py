@@ -6,19 +6,38 @@ import os
 from tqdm import tqdm
 import pickle
 
-'''TODO: document everything in here'''
 
-def read_articles(file_path='./data/paths-and-graph/articles.tsv'):
+def get_bad_articles(filepath='./data/paths-and-graph/articles.tsv'):
+    '''Returns the name and index of the articles in articles.tsv that are not wikipedia articles and should be removed.'''
 
-    articles = pd.read_csv(file_path, comment='#', names=["article"])
+    articles = pd.read_csv(filepath, comment='#', names=["article"])
     articles = articles["article"].apply(unquote).replace('_', ' ', regex=True)
+
+    # The bad articles are not real wikipedia pages, cannot be parsed by the html parser and are do not appear in user paths
+    bad_articles = ['Directdebit', 'Donation', 'Friend Directdebit', 'Sponsorship Directdebit', 'Wowpurchase']
+    bad_articles_idx = articles[articles.isin(bad_articles)].index
+
+    return bad_articles, bad_articles_idx.to_list()
+
+def read_articles(filepath='./data/paths-and-graph/articles.tsv'):
+    '''
+    Return a Series with the article names, with '_' removed and the percent encoding unquoted.
+    Removes the articles in the list that are not wikipedia articles.
+    '''
+
+    articles = pd.read_csv(filepath, comment='#', names=["article"])
+    articles = articles["article"].apply(unquote).replace('_', ' ', regex=True)
+    bad_articles, _ = get_bad_articles()
+    articles = articles[~articles.isin(bad_articles)].reset_index(drop=True)
 
     return articles
 
-def read_categories(file_path='./data/paths-and-graph/categories.tsv'):
+def read_categories(filepath='./data/paths-and-graph/categories.tsv'):
 
     # Step 1: Load the data
-    categories = pd.read_csv(file_path, sep='\t', comment='#', names=["article", "category"])
+    categories = pd.read_csv(filepath, sep='\t', comment='#', names=["article", "category"])
+    bad_articles, _ = get_bad_articles()
+    categories = categories[~categories['article'].isin(bad_articles)].reset_index(drop=True)
     categories["article"] = categories["article"].apply(unquote).replace('_', ' ', regex=True)
 
     # Step 2: Separate categories by hierarchical levels
@@ -41,18 +60,22 @@ def read_categories(file_path='./data/paths-and-graph/categories.tsv'):
 
     return df_expanded
 
-def read_links(file_path='./data/paths-and-graph/links.tsv'):
+def read_links(filepath='./data/paths-and-graph/links.tsv'):
+    '''Finds all the existing links between articles, removes invalid articles'''
 
-    links = pd.read_csv(file_path, sep='\t', comment='#', names=["linkSource", "linkTarget"])
+    links = pd.read_csv(filepath, sep='\t', comment='#', names=["linkSource", "linkTarget"])
+    bad_articles, _ = get_bad_articles()
+    links = links[~links['linkSource'].isin(bad_articles)].reset_index(drop=True)
+    links = links[~links['linkTarget'].isin(bad_articles)].reset_index(drop=True)
     links["linkSource"] = links["linkSource"].apply(unquote).replace('_', ' ', regex=True)
     links["linkTarget"] = links["linkTarget"].apply(unquote).replace('_', ' ', regex=True)
 
     return links
 
-def read_shortest_path_matrix(file_path='./data/paths-and-graph/shortest-path-distance-matrix.txt'):
+def read_shortest_path_matrix(filepath='./data/paths-and-graph/shortest-path-distance-matrix.txt'):
     '''The rows are the source articles and the columns are the destination articles'''
     
-    with open(file_path, 'r') as file:
+    with open(filepath, 'r') as file:
         lines = file.readlines()
 
     # Process each line to convert it into a list of distances
@@ -66,17 +89,22 @@ def read_shortest_path_matrix(file_path='./data/paths-and-graph/shortest-path-di
 
     matrix = pd.DataFrame(data, dtype=int)
 
+    # Drop bad articles
+    _, bad_articles_idx = get_bad_articles()
+    matrix.drop(index=bad_articles_idx, inplace=True)
+    matrix.drop(columns=bad_articles_idx, inplace=True)
+
     # Read the articles.tsv file to use as column headers & index
     names_articles = read_articles()
     matrix.columns = names_articles
-    matrix.index = names_articles    
+    matrix.index = names_articles  
 
     return matrix
 
-def read_unfinished_paths(file_path='./data/paths-and-graph/paths_unfinished.tsv'):
+def read_unfinished_paths(filepath='./data/paths-and-graph/paths_unfinished.tsv'):
 
     column_names = ['hashedIpAddress', 'timestamp', 'durationInSec', 'path', 'target', "type"]
-    df = pd.read_csv(file_path, sep='\t', comment='#', names=column_names)
+    df = pd.read_csv(filepath, sep='\t', comment='#', names=column_names)
 
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
     df['path'] = df['path'].apply(unquote).replace('_', ' ', regex=True)
@@ -84,10 +112,10 @@ def read_unfinished_paths(file_path='./data/paths-and-graph/paths_unfinished.tsv
 
     return df
 
-def read_finished_paths(file_path='./data/paths-and-graph/paths_finished.tsv'):
+def read_finished_paths(filepath='./data/paths-and-graph/paths_finished.tsv'):
 
     column_names = ['hashedIpAddress', 'timestamp', 'durationInSec', 'path', 'rating']
-    df = pd.read_csv(file_path, sep='\t', comment='#', names=column_names)
+    df = pd.read_csv(filepath, sep='\t', comment='#', names=column_names)
 
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
     df['path'] = df['path'].apply(unquote).replace('_', ' ', regex=True)
@@ -95,9 +123,9 @@ def read_finished_paths(file_path='./data/paths-and-graph/paths_finished.tsv'):
     return df
 
 class htmlParser:
-    def __init__(self, file_path='./data/articles_html/wp'):
+    def __init__(self, filepath='./data/articles_html/wp'):
         self.article_URLs = [] # full article paths
-        for subdir, dirs, files in os.walk(file_path):
+        for subdir, dirs, files in os.walk(filepath):
             for file in files:
                 article_link = os.path.join(subdir, file).replace('\\', '/')
                 if self.is_valid_link(article_link):
@@ -347,10 +375,8 @@ class htmlParser:
         '''
 
         articles_stats = []
-        print('Articles that could not be parsed:\n') # TODO: remove print when issue adressed
         for key, art in self.parsed_articles.items():
             if art is None: 
-                print(key)
                 continue
             article_stats = {
                 'article_name': art['title'],
