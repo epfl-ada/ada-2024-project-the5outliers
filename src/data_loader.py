@@ -6,6 +6,8 @@ import os
 from tqdm import tqdm
 import pickle
 
+'''TODO: document everything in here'''
+
 def read_articles(file_path='./data/paths-and-graph/articles.tsv'):
 
     articles = pd.read_csv(file_path, comment='#', names=["article"])
@@ -47,8 +49,9 @@ def read_links(file_path='./data/paths-and-graph/links.tsv'):
 
     return links
 
-def read_matrix(file_path='./data/paths-and-graph/shortest-path-distance-matrix.txt'):
-
+def read_shortest_path_matrix(file_path='./data/paths-and-graph/shortest-path-distance-matrix.txt'):
+    '''The rows are the source articles and the columns are the destination articles'''
+    
     with open(file_path, 'r') as file:
         lines = file.readlines()
 
@@ -67,7 +70,6 @@ def read_matrix(file_path='./data/paths-and-graph/shortest-path-distance-matrix.
     names_articles = read_articles()
     matrix.columns = names_articles
     matrix.index = names_articles    
-    print("The rows are the source articles and the columns are the destination articles")
 
     return matrix
 
@@ -337,3 +339,33 @@ class htmlParser:
     def load_pickle(self, filename='./data/paths-and-graph/parsed_html.pkl'):
         with open(filename, 'rb') as file:
             self.parsed_articles = pickle.load(file)
+    
+    def get_df_html_stats(self):
+        '''
+        Get a Dataframe with general information over the parsed data,
+        namely word and link counts, link density, number of categories and special elements.
+        '''
+
+        articles_stats = []
+        print('Articles that could not be parsed:\n') # TODO: remove print when issue adressed
+        for key, art in self.parsed_articles.items():
+            if art is None: 
+                print(key)
+                continue
+            article_stats = {
+                'article_name': art['title'],
+                'total_words': art['total_words'],
+                'total_links': len(art['total_links']),
+                'link_density': len(art['total_links']) / art['total_words'],
+                'abstract_words': art['abstract_length'],
+                'abstract_links': len(art['abstract_links']),
+                'abstract_link_density': len(art['abstract_links']) / art['abstract_length'],
+                'num_categories': len(art['categories_data']),
+                'num_subcategories': sum(len(cat.get('subcategories', [])) for cat in art['categories_data']),
+                'num_tables': len(art['tables'])
+            }
+            articles_stats.append(article_stats)
+
+        df_html_stats = pd.DataFrame(articles_stats)
+
+        return df_html_stats
