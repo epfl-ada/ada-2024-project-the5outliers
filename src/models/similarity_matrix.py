@@ -3,6 +3,8 @@ from gensim.models import KeyedVectors
 import numpy as np
 import networkx as nx
 import os
+import pandas as pd
+from tqdm import tqdm
 
 
 def gensim_embedding(df):
@@ -26,7 +28,7 @@ def BGEM3_embedding(df):
 
     return embeddings
 
-def compute_similarity_matrix(embeddings):
+def compute_embedding_similarity_matrix(embeddings):
     '''Computes the cosine similarity of embeddings. Embeddings are already normalised to 1, so the similarity is the dot product'''
     
     return np.matmul(embeddings, embeddings.T)
@@ -87,3 +89,63 @@ def central_words(similarity_matrix):
     pagerank_sorted = sorted(pagerank_scores.items(), key=lambda x: x[1], reverse=True)
 
     return eigenvector_centrality_sorted, pagerank_sorted
+
+def category_jaccard_similarity(categories, level_weights):
+    """
+    Calculates the Weighted Jaccard Similarity between articles based on category levels and weights.
+
+    Parameters:
+    - categories (DataFrame): Contains columns 'article', 'category', 'level_1', 'level_2', 'level_3' for each article's category and level information.
+    - level_weights (dict): A dictionary with weights for each level, e.g., {'level_1': 3, 'level_2': 2, 'level_3': 1}.
+
+    Returns:
+    - DataFrame: Weighted Jaccard Similarity matrix with articles as both rows and columns.
+    """
+
+    # Assign weights to each article's category based on its levels
+    categories['weight'] = (
+        categories['level_1'].apply(lambda x: level_weights['level_1'] if pd.notnull(x) else 0) +
+        categories['level_2'].apply(lambda x: level_weights['level_2'] if pd.notnull(x) else 0) +
+        categories['level_3'].apply(lambda x: level_weights['level_3'] if pd.notnull(x) else 0)
+    )
+
+    # Create pivot table with articles and categories
+    category_pivot = categories.pivot_table(
+        index='article',
+        columns='category',
+        values='weight',
+        aggfunc='max',
+        fill_value=0
+    )
+
+    # Convert pivot table to a NumPy array
+    A = category_pivot.values  # Shape: (n_articles, n_categories)
+    n = A.shape[0]  # Number of articles
+
+    # Initialize similarity matrix
+    similarity_weighted_jaccard = np.zeros((n, n))
+
+    # Compute Weighted Jaccard Similarity for each article pair
+    for i in tqdm(range(n), desc="Computing Weighted Jaccard Similarity"):
+        # Compute min and max with all other articles
+        min_vals = np.minimum(A[i], A)
+        max_vals = np.maximum(A[i], A)
+
+        # Sum over categories to get intersection and union
+        intersection = min_vals.sum(axis=1)
+        union = max_vals.sum(axis=1)
+
+        # Compute similarity, handling division by zero
+        with np.errstate(divide='ignore', invalid='ignore'):
+            similarity = np.divide(intersection, union, out=np.zeros_like(intersection, dtype=float), where=union != 0)
+
+        similarity_weighted_jaccard[i] = similarity
+
+    # Convert the similarity matrix to a DataFrame with article indices
+    similarity_weighted_jaccard_df = pd.DataFrame(
+        similarity_weighted_jaccard,
+        index=category_pivot.index,
+        columns=category_pivot.index
+    )
+
+    return similarity_weighted_jaccard_df  

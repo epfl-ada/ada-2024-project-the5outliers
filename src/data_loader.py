@@ -8,14 +8,14 @@ import pickle
 
 
 def get_bad_articles():
-    '''Returns the name and index of the articles in articles.tsv that are not wikipedia articles and should be removed.'''
+    '''Returns the name and index of the articles in articles.tsv that are not wikipedia articles or that have missing propreties (e.g. missing categories) and should be removed.'''
 
     filepath='./data/paths-and-graph/articles.tsv'
     articles = pd.read_csv(filepath, comment='#', names=["article"])
     articles = articles["article"].apply(unquote).replace('_', ' ', regex=True)
 
     # The bad articles are not real wikipedia pages, cannot be parsed by the html parser and are do not appear in user paths
-    bad_articles = ['Directdebit', 'Donation', 'Friend Directdebit', 'Sponsorship Directdebit', 'Wowpurchase']
+    bad_articles = ['Directdebit', 'Donation', 'Friend Directdebit', 'Sponsorship Directdebit', 'Wowpurchase', 'Pikachu','Wikipedia Text of the GNU Free Documentation License']
     bad_articles_idx = articles[articles.isin(bad_articles)].index
 
     return bad_articles, bad_articles_idx.to_list()
@@ -29,6 +29,8 @@ def read_articles():
     filepath='./data/paths-and-graph/articles.tsv'
     articles = pd.read_csv(filepath, comment='#', names=["article"])
     articles = articles["article"].apply(unquote).replace('_', ' ', regex=True)
+    
+    # Remove invalid articles
     bad_articles, _ = get_bad_articles()
     articles = articles[~articles.isin(bad_articles)].reset_index(drop=True)
 
@@ -39,10 +41,11 @@ def read_categories():
     # Step 1: Load the data
     filepath='./data/paths-and-graph/categories.tsv'
     categories = pd.read_csv(filepath, sep='\t', comment='#', names=["article", "category"])
-    bad_articles, _ = get_bad_articles()
-    categories = categories[~categories['article'].isin(bad_articles)].reset_index(drop=True)
     categories["article"] = categories["article"].apply(unquote).replace('_', ' ', regex=True)
     categories["category"] = categories["category"].apply(unquote).replace('_', ' ', regex=True)
+
+    # Remove invalid articles
+    categories = categories.loc[categories['article'].isin(read_articles()), :].reset_index(drop=True)
 
     # Step 2: Separate categories by hierarchical levels
     # Find the maximum depth by checking the highest number of splits in any category
@@ -69,11 +72,12 @@ def read_links():
 
     filepath='./data/paths-and-graph/links.tsv'
     links = pd.read_csv(filepath, sep='\t', comment='#', names=["linkSource", "linkTarget"])
-    bad_articles, _ = get_bad_articles()
-    links = links[~links['linkSource'].isin(bad_articles)].reset_index(drop=True)
-    links = links[~links['linkTarget'].isin(bad_articles)].reset_index(drop=True)
     links["linkSource"] = links["linkSource"].apply(unquote).replace('_', ' ', regex=True)
     links["linkTarget"] = links["linkTarget"].apply(unquote).replace('_', ' ', regex=True)
+    
+    # Remove invalid articles
+    links = links.loc[links['linkSource'].isin(read_articles()), :].reset_index(drop=True)
+    links = links.loc[links['linkTarget'].isin(read_articles()), :].reset_index(drop=True)
 
     return links
 
@@ -117,6 +121,37 @@ def read_unfinished_paths():
     df['path'] = df['path'].apply(unquote).replace('_', ' ', regex=True)
     df['target'] = df['target'].apply(unquote).replace('_', ' ', regex=True)
 
+    print("Unfinished Paths \nNumber of rows before filtering:", len(df))
+    # Drop invalid articles
+    valid_articles = set(read_articles())
+    valid_articles.add("<")
+
+    invalid_target_articles = set()
+    for target in df['target']:
+        if target not in valid_articles:
+            invalid_target_articles.add(target)
+    print("Invalid target articles found:", invalid_target_articles)
+    # Drop rows with invalid target articles
+    df = df.loc[df['target'].isin(valid_articles)].reset_index(drop=True)
+    
+    invalid_articles_set = set()
+    # Filter and find invalid articles
+    def check_path(path):
+        articles = path.split(';')
+        for article in articles:
+            article = article.strip()
+            if article not in valid_articles:
+                invalid_articles_set.add(article)  # Add only the invalid article
+                return False  # Exclude this row if any invalid article is found
+        return True  # Include this row if all articles are valid
+
+    # Apply the filter with the custom function
+    df = df[df["path"].apply(check_path)].reset_index(drop=True)
+
+    # Print unique invalid articles
+    print("Invalid articles found in path:", invalid_articles_set)
+    print("Number of rows after filtering:", len(df),"\n")
+
     return df
 
 def read_finished_paths():
@@ -128,6 +163,31 @@ def read_finished_paths():
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
     df['path'] = df['path'].apply(unquote).replace('_', ' ', regex=True)
 
+    print("Finished Paths \nNumber of rows before filtering:", len(df))
+    # Drop invalid articles
+    valid_articles = set(read_articles())
+    valid_articles.add("<")
+    
+    # Set to store unique invalid articles
+    invalid_articles_set = set()
+
+    # Filter and find invalid articles
+    def check_path(path):
+        articles = path.split(';')
+        for article in articles:
+            article = article.strip()
+            if article not in valid_articles:
+                invalid_articles_set.add(article)  # Add only the invalid article
+                return False  # Exclude this row if any invalid article is found
+        return True  # Include this row if all articles are valid
+
+    # Apply the filter with the custom function
+    df = df[df["path"].apply(check_path)].reset_index(drop=True)
+
+    # Print unique invalid articles
+    print("Invalid articles found in path:", invalid_articles_set)
+    print("Number of rows after filtering:", len(df),"\n")
+    
     return df
 
 def read_similartiy_matrix():
