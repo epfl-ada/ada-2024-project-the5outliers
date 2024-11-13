@@ -151,6 +151,21 @@ def find_shortest_distance(row, distance_matrix):
         return distance_matrix.loc[articles[0]][row['target']]
     return distance_matrix.loc[articles[0]][articles[-1]]
 
+def replace_back_clicks(path):
+    '''Replaces back clicks < with the article that was landed on'''
+    articles = path.split(';')
+    resolved_path = []
+    consecutive_backclicks = 0
+    for i, art in enumerate(articles):
+        if art == '<':
+            resolved_path.append(resolved_path[i-2-consecutive_backclicks])
+            consecutive_backclicks += 2
+        else:
+            consecutive_backclicks=0
+            resolved_path.append(art)
+    
+    return resolved_path
+
 class htmlParser:
     def __init__(self, filepath='./data/articles_html/wp'):
         self.article_URLs = [] # full article paths
@@ -203,6 +218,7 @@ class htmlParser:
             words = body_content.get_text(separator=' ', strip=True).split()
             links = body_content.find_all('a')
             URLs = self.get_URLs_from_links(links)
+            linked_articles = self.links_to_articles(URLs)
 
             # ABSTRACT (short text right under title and before the first h2 category)
             first_h2 = body_content.find('h2')
@@ -216,6 +232,7 @@ class htmlParser:
                 if hasattr(child, 'find_all'):
                     abstract_links += child.find_all('a')
             abstract_URLs = self.get_URLs_from_links(abstract_links)
+            abstract_linked_articles = self.links_to_articles(abstract_URLs)
             
             # CATEGORIES AND SUBCATEGORIES
             categories_data = self.parse_categories(body_content)
@@ -233,19 +250,20 @@ class htmlParser:
                 tables_text = table.get_text(separator=' ', strip=True)
                 table_links = table.find_all('a')
                 table_URLs = self.get_URLs_from_links(table_links)
+                table_linked_articles = self.links_to_articles(table_URLs)
 
                 tables_data.append({
                     'class': table_class,
                     'num_words': len(tables_text.split()),
-                    'table_links': table_URLs
+                    'table_links': table_linked_articles
                 })
 
             DATA = {
                 'title': title,
                 'total_words': len(words),
-                'total_links': URLs,
+                'total_links': linked_articles,
                 'abstract_length': len(abstract_text.split()),
-                'abstract_links': abstract_URLs,
+                'abstract_links': abstract_linked_articles,
                 'categories_data': categories_data,
                 'tables': tables_data
             }
@@ -278,11 +296,12 @@ class htmlParser:
                     h2_links += sibling.find_all('a')
 
             h2_URLs = self.get_URLs_from_links(h2_links)
+            h2_linked_articles = self.links_to_articles(h2_URLs)
                 
             categories_data.append({
                 'name': category_name,
                 'num_words': len(h2_text.split()),
-                'h2_links': h2_URLs,
+                'h2_links': h2_linked_articles,
                 'subcategories': self.parse_subcategories(h2) # h3 categories: for each h2 category, check if there are subcategories
             })
 
@@ -316,16 +335,18 @@ class htmlParser:
                     h3_links += sibling.find_all('a')
 
                 h3_URLs = self.get_URLs_from_links(h3_links)
+                h3_linked_articles = self.links_to_articles(h3_URLs)
 
             subcategories_data.append({
                 'name': subcategory_name,
                 'num_words': len(h3_text.split()),
-                'h3_links': h3_URLs
+                'h3_links': h3_linked_articles
             })
 
         return subcategories_data
     
     def get_overview(self, parsed_data):
+        '''Print out the overview of an article: abstract words and links, total word and links at statistics for (sub)categories and tables'''
 
         print("Page Overview")
         print("-------------")
@@ -367,6 +388,7 @@ class htmlParser:
 
         link_href = [link.get('href') for link in links if link.get('href')]
         link_urls = [link for link in link_href if self.is_valid_link(link)]
+        link_article = [link for link in link_href if self.is_valid_link(link)]
 
         return link_urls
 
@@ -389,11 +411,13 @@ class htmlParser:
 
         return df_article_names
     
-    def save_pickle(self, filename='./data/paths-and-graph/parsed_html.pkl'):
+    def save_pickle(self):
+        filename='./data/paths-and-graph/parsed_html.pkl'
         with open(filename, 'wb') as file:
             pickle.dump(self.parsed_articles, file)
 
-    def load_pickle(self, filename='./data/paths-and-graph/parsed_html.pkl'):
+    def load_pickle(self):
+        filename='./data/paths-and-graph/parsed_html.pkl'
         with open(filename, 'rb') as file:
             self.parsed_articles = pickle.load(file)
     
@@ -424,3 +448,45 @@ class htmlParser:
         df_html_stats = pd.DataFrame(articles_stats)
 
         return df_html_stats
+    
+    def find_link_positions(self, article_start, article_next):
+        '''
+        Finds where the link to article_next is placed inside article_start. 
+        Returns in which category/table it is placed in, and how many links and words roughly preceded it.
+        If a link is present multiple times, returns all the instances found.
+        '''
+
+        article_start = self.parsed_articles[article_start]
+        occurences = article_start['total_links'][article_start['total_links'] == article_next].index
+        occurences_abstract = article_start['abstract_links'][article_start['abstract_links'] == article_next].index
+        occurences_categories = []
+        for key, val in article_start['categories_data']:
+            [article_start['abstract_links'] == article_next].index
+        occurences_subcategories = article_start['abstract_links'][article_start['abstract_links'] == article_next].index
+        occurences_tables = article_start['abstract_links'][article_start['abstract_links'] == article_next].index
+
+        link_position = {
+            'total_links': len(article_start['total_links']),
+            'article_link_position': [x+1 for x in occurences.tolist()],
+
+        }
+
+        return link_position
+    
+    def find_path_link_positions(self, df_paths):
+        '''
+        For every path of user games, finds where on the wikipedia page the link could have been clicked
+        df_finished.sample(1, random_state=2)
+        '''
+
+        for path in df_paths.sample(1, random_state=2)['path']:
+            articles = path.split(';')
+            no_back_clicks = replace_back_clicks(path)
+            print(articles)
+            print(no_back_clicks)
+            
+            for a in range(len(articles)-1):
+                if articles[a+1] == '<':
+                    continue
+                else:
+                    print(self.find_link_position(no_back_clicks[a], no_back_clicks[a+1]))
