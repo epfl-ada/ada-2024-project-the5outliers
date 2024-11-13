@@ -28,7 +28,7 @@ def BGEM3_embedding(df):
 
     return embeddings
 
-def compute_similarity_matrix(embeddings):
+def compute_embedding_similarity_matrix(embeddings):
     '''Computes the cosine similarity of embeddings. Embeddings are already normalised to 1, so the similarity is the dot product'''
     
     return np.matmul(embeddings, embeddings.T)
@@ -90,7 +90,7 @@ def central_words(similarity_matrix):
 
     return eigenvector_centrality_sorted, pagerank_sorted
 
-def calculate_weighted_jaccard_similarity(categories, level_weights):
+def category_jaccard_similarity(categories, level_weights):
     """
     Calculates the Weighted Jaccard Similarity between articles based on category levels and weights.
 
@@ -148,7 +148,4 @@ def calculate_weighted_jaccard_similarity(categories, level_weights):
         columns=category_pivot.index
     )
 
-    return similarity_weighted_jaccard_df
-
-    
-    
+    return similarity_weighted_jaccard_df  
