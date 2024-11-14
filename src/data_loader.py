@@ -121,35 +121,39 @@ def read_unfinished_paths():
     df['path'] = df['path'].apply(unquote).replace('_', ' ', regex=True)
     df['target'] = df['target'].apply(unquote).replace('_', ' ', regex=True)
 
-    print("Unfinished Paths \nNumber of rows before filtering:", len(df))
+
     # Drop invalid articles
+    print("Unfinished Paths \nNumber of rows before filtering:", len(df))
     valid_articles = set(read_articles())
     valid_articles.add("<")
 
+    ## Drop rows with invalid target articles
     invalid_target_articles = set()
     for target in df['target']:
         if target not in valid_articles:
             invalid_target_articles.add(target)
     print("Invalid target articles found:", invalid_target_articles)
-    # Drop rows with invalid target articles
     df = df.loc[df['target'].isin(valid_articles)].reset_index(drop=True)
-    
+
+    ## Drop invalid articles in the path
     invalid_articles_set = set()
-    # Filter and find invalid articles
     def check_path(path):
         articles = path.split(';')
         for article in articles:
             article = article.strip()
             if article not in valid_articles:
-                invalid_articles_set.add(article)  # Add only the invalid article
-                return False  # Exclude this row if any invalid article is found
+                invalid_articles_set.add(article)  
+                return False  # Exclude this row if any article is invalid
         return True  # Include this row if all articles are valid
-
-    # Apply the filter with the custom function
     df = df[df["path"].apply(check_path)].reset_index(drop=True)
-
-    # Print unique invalid articles
     print("Invalid articles found in path:", invalid_articles_set)
+
+    len_df = len(df)
+    ## Drop rows where 'type' is 'timeout' and 'durationInSec' is less than 1800
+    df = df[~((df['type'] == 'timeout') & (df['durationInSec'] < 1800))].reset_index(drop=True)
+    print("Number of rows dropped of type 'timeout' with a duration less than 30 minutes:", len_df - len(df))
+    print("Type 'timeout' occurs only after 30 minutes of inactivity, thus this path are technically impossible.")
+
     print("Number of rows after filtering:", len(df),"\n")
 
     return df
@@ -163,28 +167,21 @@ def read_finished_paths():
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
     df['path'] = df['path'].apply(unquote).replace('_', ' ', regex=True)
 
-    print("Finished Paths \nNumber of rows before filtering:", len(df))
     # Drop invalid articles
+    print("Finished Paths \nNumber of rows before filtering:", len(df))
     valid_articles = set(read_articles())
     valid_articles.add("<")
-    
-    # Set to store unique invalid articles
-    invalid_articles_set = set()
 
-    # Filter and find invalid articles
+    invalid_articles_set = set()
     def check_path(path):
         articles = path.split(';')
         for article in articles:
             article = article.strip()
             if article not in valid_articles:
-                invalid_articles_set.add(article)  # Add only the invalid article
-                return False  # Exclude this row if any invalid article is found
+                invalid_articles_set.add(article)  
+                return False  # Exclude this row if any article is invalid
         return True  # Include this row if all articles are valid
-
-    # Apply the filter with the custom function
     df = df[df["path"].apply(check_path)].reset_index(drop=True)
-
-    # Print unique invalid articles
     print("Invalid articles found in path:", invalid_articles_set)
     print("Number of rows after filtering:", len(df),"\n")
     
@@ -199,6 +196,14 @@ def read_similartiy_matrix():
     df_sm.index = article_names
 
     return df_sm
+
+def read_categories_matrix():
+    filepath='./data/paths-and-graph/category_jaccard_similarity.npy'
+    articles_names = read_articles()
+    df_cm = pd.DataFrame(np.load(filepath, allow_pickle=True))
+    df_cm.columns = articles_names
+    df_cm.index = articles_names
+    return df_cm
 
 def find_shortest_distance(row, distance_matrix):
     '''
