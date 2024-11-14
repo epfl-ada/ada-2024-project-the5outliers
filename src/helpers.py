@@ -253,3 +253,47 @@ def voyage_sorting(paths, categories):
 
     # Display the filtered paths
     return paths
+
+def backtrack(paths) :
+    """
+    Compute the number of backtracks in each path.
+    """
+
+    paths["path_list"] = paths["path"].apply(lambda x: x.split(";"))
+    paths["back_nb"]=paths["path_list"].apply(lambda x: x.count("<"))
+    paths["size"]=paths["path_list"].apply(lambda x: len(x))
+    paths["have_back"] = paths["back_nb"] > 0
+
+    return paths
+
+def find_category_path(path_list, categories) :
+    """
+    Find the list of category for a given list of articles.
+    """
+    categories = [categories[categories["article"]==article]["level_1"].values[0] for article in path_list if article in categories["article"].values]
+    return categories
+
+def extract_category_path(paths, categories) :
+    """
+    Extract the category path for each path.
+    """
+    paths["path_list"] = paths["path"].apply(lambda x: x.split(";"))
+    paths["category"] = paths["path_list"].apply(lambda x: find_category_path(x, categories))
+    paths["category"] = paths["category"].apply(lambda x : list(set(list(x))))
+    return paths
+
+def find_categories_start_end(paths, categories) :
+    
+    """
+    Find the start and end category of each path.
+    """
+
+    paths["start"] = paths["path"].apply(lambda x: x.split(";")[0])
+    if "target" in paths.columns:
+        paths["end"] = paths["target"]
+    else :
+        paths["end"] = paths["path"].apply(lambda x: x.split(";")[-1])
+    paths["start_category"] = paths["start"].apply(lambda x: categories[categories["article"] == x]["category"].values[0].split(".")[1] if x in categories["article"].values else None)
+    paths["end_category"] = paths["end"].apply(lambda x: categories[categories["article"] == x]["category"].values[0].split(".")[1] if x in categories["article"].values else None)
+
+    return paths
