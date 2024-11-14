@@ -4,9 +4,11 @@ data/articles_plaintext/*
 data/paths-and-graph/*
 !data/paths-and-graph/embedded_articles.npy
 !data/paths-and-graph/similarity_matrix.npy
+!data/paths-and-graph/category_jaccard_similarity.npy
 !data/paths-and-graph/parsed_html.pkl
 *.bin
 .vscode/settings.json
+*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
