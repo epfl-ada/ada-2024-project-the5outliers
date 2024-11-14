@@ -6,9 +6,15 @@ data/paths-and-graph/*
 !data/paths-and-graph/similarity_matrix.npy
 !data/paths-and-graph/category_jaccard_similarity.npy
 !data/paths-and-graph/parsed_html.pkl
+
+# Files
+*.csv
+
+# Cache
 *.bin
 .vscode/settings.json
-*.csv
+.DS_Store
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
