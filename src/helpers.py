@@ -63,8 +63,22 @@ def create_treemap_data(df):
 
 def analyze_categories_paths(df_paths, df_categories, omit_loops=False):
     """
-    Analyze the paths to find common paths.
-    Optionally omit consecutive repetitions of the same category in paths.
+    Analyze and summarize common category paths from article paths.
+
+    Parameters:
+        df_paths (pd.DataFrame): DataFrame containing article paths with a 'path' column. 
+        df_categories (pd.DataFrame): DataFrame mapping articles to main categories, with 'article' and 'level_1' columns. 
+        omit_loops (bool): Optional; if True, removes consecutive repetitions of the same category within a path. 
+
+    Returns:
+        pd.DataFrame: A DataFrame of the most common category paths, with columns:
+            - 'Category Path': The sequence of main categories (with optional loop removal).
+            - 'Count': Number of occurrences of each unique category path.
+
+    Notes:
+        - Paths are created by mapping each article in 'df_paths' to its primary category from 'df_categories'.
+        - If an article lacks a category, it remains unchanged in the path.
+        - Each path is represented as a string with categories separated by ' -> '.
     """
     # Map articles to main categories
     article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
@@ -213,3 +227,132 @@ def plot_position_interactive(df_position, plot_type="line", normalized=False):
     
     # Show the interactive plot
     fig.show()
+
+
+def check_voyage_status(category_path, finished, n):
+    """
+    Check is the category path is voyage or not voyage, that is wether the first n categories visited are 'Geography' or 'Countries' 
+
+    Parameters:
+        category_paths (DataFrame): DataFrame with 'Category Path' column
+        finished (Boolean): whether it is a finished or not-finished path 
+        n (int): number of different categories following the first to consider 
+
+    Returns:
+        Boolean : is the path of category a voyage 
+    """    
+    # Split the category path
+    categories = category_path.split(' -> ')
+    path_len = len(categories)
+    
+    if finished : 
+        # Case 1: Path with 1 category -> always False
+        if path_len <= 2:
+            return False
+        # Case 2: Path length between 3 and n+2 -> check middle categories
+        elif 2 < path_len <= n + 2:
+            return any(category in categories[1:-1] for category in ['Geography', 'Countries'])
+        # Case 3: Path longer than n+2 -> check the first n categories after the first
+        else:
+            return any(category in categories[1:n+1] for category in ['Geography', 'Countries'])
+        
+    else : 
+        # Case 1: Path with 1 or 2 categories -> always False
+        if path_len <= 1:
+            return False
+        # Case 2: Path length between 3 and n+2 -> check middle categories
+        elif 1 < path_len <= n + 1:
+            return any(category in categories[1:] for category in ['Geography', 'Countries'])
+        # Case 3: Path longer than n+2 -> check the first n categories after the first
+        else:
+            return any(category in categories[1:n+1] for category in ['Geography', 'Countries'])    
+
+def category_voyage_sorting(category_paths, finished, n=3):
+    """
+    Adds a boolean column filtering paths into voyage or not voyage, that is whether the first n categories visited are 'Geography' or 'Countries' 
+
+    Parameters:
+        category_paths (DataFrame): DataFrame with 'Category Path' column
+        finished (Boolean): whetehr the paths are finished 
+        n (int): number of different categories following the first to consider 
+
+    Returns:
+        DataFrame: category paths with an additional 'voyage' column marked as True or False
+    """    
+    category_paths['voyage'] = category_paths['Category Path'].apply(lambda p: check_voyage_status(p, finished, n)) 
+    return category_paths 
+
+def game_voyage_sorting(df_article_paths, df_categories, finished, n=3):
+    """
+    Adds a boolean 'voyage' column to each game.
+    First maps articles to categories, then checks if the category path qualifies as a 'voyage'.
+
+    Parameters:
+        df_article_path (DataFrame): DataFrame with 'path' column containing article paths
+        df_categories (DataFrame): DataFrame with 'article' and 'level_1' columns for mapping
+        n (int): Number of different categories following the first to consider for voyage condition
+        finished (bool): Indicates whether the paths are finished 
+
+    Returns:
+        DataFrame: Original DataFrame with an additional 'voyage' column (True/False).
+    """
+    # Map articles to their main categories
+    article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
+    
+    # Convert article path to category path, omitting consecutive duplicates (loops)
+    def get_category_path(path):
+        articles = path.split(';')
+        categories = [article_to_category.get(article, article) for article in articles]
+        categories_no_loops = [cat for i, cat in enumerate(categories) if i == 0 or cat != categories[i - 1]]
+        return ' -> '.join(categories_no_loops)
+    
+    # Apply the transformation and check voyage status
+    df_article_paths['Category Path'] = df_article_paths['path'].apply(get_category_path)
+    df_article_paths['voyage'] = df_article_paths['Category Path'].apply(lambda p: check_voyage_status(p, finished, n))
+    
+    return df_article_paths
+
+
+def backtrack(paths) :
+    """
+    Compute the number of backtracks in each path.
+    """
+
+    paths["path_list"] = paths["path"].apply(lambda x: x.split(";"))
+    paths["back_nb"]=paths["path_list"].apply(lambda x: x.count("<"))
+    paths["size"]=paths["path_list"].apply(lambda x: len(x))
+    paths["have_back"] = paths["back_nb"] > 0
+
+    return paths
+
+def find_category_path(path_list, categories) :
+    """
+    Find the list of category for a given list of articles.
+    """
+    categories = [categories[categories["article"]==article]["level_1"].values[0] for article in path_list if article in categories["article"].values]
+    return categories
+
+def extract_category_path(paths, categories) :
+    """
+    Extract the category path for each path.
+    """
+    paths["path_list"] = paths["path"].apply(lambda x: x.split(";"))
+    paths["category"] = paths["path_list"].apply(lambda x: find_category_path(x, categories))
+    paths["category"] = paths["category"].apply(lambda x : list(set(list(x))))
+    return paths
+
+def find_categories_start_end(paths, categories) :
+    
+    """
+    Find the start and end category of each path.
+    """
+
+    paths["start"] = paths["path"].apply(lambda x: x.split(";")[0])
+    if "target" in paths.columns:
+        paths["end"] = paths["target"]
+    else :
+        paths["end"] = paths["path"].apply(lambda x: x.split(";")[-1])
+    paths["start_category"] = paths["start"].apply(lambda x: categories[categories["article"] == x]["category"].values[0].split(".")[1] if x in categories["article"].values else None)
+    paths["end_category"] = paths["end"].apply(lambda x: categories[categories["article"] == x]["category"].values[0].split(".")[1] if x in categories["article"].values else None)
+
+    return paths
