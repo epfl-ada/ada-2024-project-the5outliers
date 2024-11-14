@@ -213,3 +213,43 @@ def plot_position_interactive(df_position, plot_type="line", normalized=False):
     
     # Show the interactive plot
     fig.show()
+    
+def find_categories_start_end(paths, categories) :
+    """
+    Adds 2 columns for the start and end articles
+    and  2 columns for the start and end categories 
+
+    Parameters:
+        paths (DataFrame): containing columns 'paths' and 'target'
+        categories (Dataframe): containing columns 'article' and 'category'
+
+    Returns:
+        DataFrame: with first and last article and category
+    """
+    paths["start"] = paths["path"].apply(lambda x: x.split(";")[0])
+    if "target" in paths.columns:
+        paths["end"] = paths["target"]
+    else :
+        paths["end"] = paths["path"].apply(lambda x: x.split(";")[-1])
+        
+    paths["start_category"] = paths["start"].apply(lambda x: categories[categories["article"] == x]["category"].values[0].split(".")[1] if x in categories["article"].values else None)
+    paths["end_category"] = paths["end"].apply(lambda x: categories[categories["article"] == x]["category"].values[0].split(".")[1] if x in categories["article"].values else None)
+
+    return paths
+
+def voyage_sorting(paths, categories):
+    """
+    Filters paths into voyage or not voyage 
+
+    Parameters:
+        paths (DataFrame): DataFrame with a 'path' column
+        categories (DataFrame): DataFrame with 'article' and 'category' columns
+
+    Returns:
+        DataFrame: paths with an additional 'voyage' column marked as True or False
+    """    
+    voyage_articles = categories[categories['category'].str.contains('Geography|Countries', regex=True)]['article'].unique()
+    paths['voyage'] = paths['path'].apply(lambda p: any(article in p.split(';') for article in voyage_articles))
+
+    # Display the filtered paths
+    return paths
