@@ -1,6 +1,7 @@
 import pandas as pd
+import plotly.graph_objects as go
 import plotly.express as px
-
+from plotly.subplots import make_subplots
 
 def create_treemap_data(df):
     """
@@ -59,7 +60,6 @@ def create_treemap_data(df):
         node_ids[(level_1, level_2, level_3)] = id
 
     return labels, parents, values, ids
-
 
 def analyze_categories_paths(df_paths, df_categories, omit_loops=False):
     """
@@ -136,19 +136,16 @@ def filter_most_specific_category(df_categories):
 
     return df_categories_filtered
 
-
-def get_position_frequencies(df, max_position=5, normalize=False):
+def get_position_frequencies(df, max_position=5):
     """
     Calculate frequencies for each category at each position in the path up to `max_position`.
-    Optionally normalize frequencies.
     
     Parameters:
         df (DataFrame): The DataFrame containing paths.
         max_position (int): The maximum position in the path to analyze.
-        normalize (bool): Whether to normalize frequencies to percentages.
     
     Returns:
-        DataFrame: Frequencies (normalized if specified) of each category across the specified range of positions.
+        DataFrame: Frequencies of each category across the specified range of positions.
     """
     position_data = []
     
@@ -161,12 +158,8 @@ def get_position_frequencies(df, max_position=5, normalize=False):
         
         # Aggregate counts for the current position
         position_counts = df.dropna(subset=[position_column]).groupby(position_column)['Count'].sum()
-        
-        # Normalize if specified
-        if normalize:
-            position_counts = (position_counts / position_counts.sum()) * 100  # Normalize to percentage
             
-        position_counts = position_counts.reset_index(name='Frequency' if not normalize else 'Normalized Frequency')
+        position_counts = position_counts.reset_index(name='Frequency')
         position_counts['Position'] = pos + 1  # Record the position number
         position_counts.rename(columns={position_column: 'Category'}, inplace=True)
         
@@ -178,48 +171,112 @@ def get_position_frequencies(df, max_position=5, normalize=False):
 
     return position_data_df
 
-def plot_position_interactive(df_position, plot_type="line", normalized=False):
+def plot_position_line(df_position, title="Category transitions frequencies across Path Positions"):
     """
-    Plot an interactive plot of category frequencies across positions with hue as categories.
-    Supports both line and bar plots, with optional normalization and stacking.
+    Plot an interactive line plot of category frequencies across positions with both normalized and non-normalized views.
     
     Parameters:
         df_position (DataFrame): DataFrame with position frequencies for each category.
-        plot_type (str): Type of plot to generate ("line" or "bar").
-        normalized (bool): If True, indicates that frequencies are normalized.
     """
-    # Select y-axis label based on normalization
-    y_col = "Normalized Frequency" if normalized else "Frequency"
-    title = f"{'Normalized ' if normalized else ''}Category Frequencies Across Path Positions"
+    # Prepare data for normalized frequencies
+    df_position_norm = df_position.copy()
+    df_position_norm['Normalized Frequency'] = df_position_norm.groupby('Position')['Frequency'].transform(lambda x: (x / x.sum()) * 100)
     
-    # Choose plot type
-    if plot_type == "line":
-        fig = px.line(
-            df_position, 
-            x="Position", 
-            y=y_col, 
-            color="Category", 
-            markers=True,
-            title=title,
-            labels={"Position": "Position in Path", y_col: "Percentage (%)" if normalized else "Frequency"}
-        )
-    elif plot_type == "bar":
-        fig = px.bar(
-            df_position, 
-            x="Position", 
-            y=y_col, 
-            color="Category", 
-            title=title,
-            labels={"Position": "Position in Path", y_col: "Percentage (%)" if normalized else "Frequency"},
-            barmode="stack"
-        )
-    else:
-        raise ValueError("Invalid plot_type. Choose 'line' or 'bar'.")
+    # Define a color map for categories
+    unique_categories = df_position['Category'].unique()
+    colors = px.colors.qualitative.Plotly  # Choose a color scheme
+    color_map = {category: colors[i % len(colors)] for i, category in enumerate(unique_categories)}
     
-    # Update layout for better readability
+    # Create subplots with separate y-axes
+    fig = make_subplots(
+        rows=1, cols=2, subplot_titles=("Non-Normalized Frequencies", "Normalized Frequencies"),
+        horizontal_spacing=0.05
+    )
+    
+    # Add non-normalized line plot traces
+    for category in unique_categories:
+        category_data = df_position[df_position['Category'] == category]
+        fig.add_trace(
+            go.Scatter(
+                x=category_data['Position'], 
+                y=category_data['Frequency'],
+                mode="lines+markers",
+                name=category,
+                line=dict(color=color_map[category])
+            ), row=1, col=1
+        )
+    
+    # Add normalized line plot traces
+    for category in unique_categories:
+        category_data_norm = df_position_norm[df_position_norm['Category'] == category]
+        fig.add_trace(
+            go.Scatter(
+                x=category_data_norm['Position'], 
+                y=category_data_norm['Normalized Frequency'],
+                mode="lines+markers",
+                name=category,
+                line=dict(color=color_map[category]),
+                showlegend=False  # Show legend only on the first subplot
+            ), row=1, col=2
+        )
+
+    # Update layout for better readability with separate y-axes
     fig.update_layout(
+        title=title,
+        xaxis_title="Position in Path",
+        yaxis=dict(title="Frequency"),
+        xaxis2_title="Position in Path",
+        yaxis2=dict(title="Percentage (%)"),
         legend_title_text="Category",
-        xaxis=dict(tickmode="linear", tick0=1, dtick=1),  # Ensure integer x-axis ticks
+        template="plotly_white",
+        width=1200,
+        height=600
+    )
+    
+    # Show the interactive plot
+    fig.show()
+
+def plot_normalized_position_bar(df_position, title="Normalized Category Frequencies Across Path Positions"):
+    """
+    Plot a normalized stacked bar chart of category frequencies across positions.
+    
+    Parameters:
+        df_position (DataFrame): DataFrame with position frequencies for each category.
+    """
+    # Prepare data for normalized frequencies
+    df_position_norm = df_position.copy()
+    df_position_norm['Normalized Frequency'] = df_position_norm.groupby('Position')['Frequency'].transform(lambda x: (x / x.sum()) * 100)
+    
+    # Define a color map for categories
+    unique_categories = df_position['Category'].unique()
+    colors = px.colors.qualitative.Plotly  # Select a color scheme
+    color_map = {category: colors[i % len(colors)] for i, category in enumerate(unique_categories)}
+    
+    # Create a subplot structure (only one subplot here for normalized bar chart)
+    fig = make_subplots(
+        rows=1, cols=1, subplot_titles=("Normalized Category Frequencies Across Path Positions",),
+        horizontal_spacing=0.15
+    )
+    
+    # Add traces for each category with consistent colors
+    for category in unique_categories:
+        category_data_norm = df_position_norm[df_position_norm['Category'] == category]
+        fig.add_trace(
+            go.Bar(
+                x=category_data_norm['Position'], 
+                y=category_data_norm['Normalized Frequency'],
+                name=category,
+                marker_color=color_map[category]
+            ), row=1, col=1
+        )
+    
+    # Set bar mode to stack
+    fig.update_layout(
+        barmode="stack",
+        title=title,
+        xaxis=dict(title="Position in Path", tickmode="linear", dtick=1),  # Ensure integer x-axis ticks
+        yaxis=dict(title="Percentage (%)"),
+        legend_title_text="Category",
         template="plotly_white",
         width=900,
         height=600
@@ -227,7 +284,6 @@ def plot_position_interactive(df_position, plot_type="line", normalized=False):
     
     # Show the interactive plot
     fig.show()
-
 
 def check_voyage_status(category_path, finished, n):
     """
@@ -311,7 +367,6 @@ def game_voyage_sorting(df_article_paths, df_categories, finished, n=3):
     df_article_paths['voyage'] = df_article_paths['Category Path'].apply(lambda p: check_voyage_status(p, finished, n))
     
     return df_article_paths
-
 
 def backtrack(paths) :
     """
