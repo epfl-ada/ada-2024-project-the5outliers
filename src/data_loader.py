@@ -448,7 +448,6 @@ class htmlParser:
 
         link_href = [link.get('href') for link in links if link.get('href')]
         link_urls = [link for link in link_href if self.is_valid_link(link)]
-        link_article = [link for link in link_href if self.is_valid_link(link)]
 
         return link_urls
 
@@ -515,21 +514,33 @@ class htmlParser:
         Returns in which category/table it is placed in, and how many links and words roughly preceded it.
         If a link is present multiple times, returns all the instances found.
         '''
+        link_position = {}
 
+        # global position in article
         article_start = self.parsed_articles[article_start]
-        occurences = article_start['total_links'][article_start['total_links'] == article_next].index
-        occurences_abstract = article_start['abstract_links'][article_start['abstract_links'] == article_next].index
+        occurences = article_start['total_links'][article_start['total_links'] == article_next].index.tolist()
+        link_position['total_links'] = len(article_start['total_links'])
+        link_position['total_words'] = article_start['total_words']
+        link_position['article_link_position'] = [x+1 for x in occurences]
+
+        # occurences in abstract
+        occurences_abstract = article_start['abstract_links'][article_start['abstract_links'] == article_next].index.tolist()
+        if occurences_abstract:
+            link_position['abstract_links'] = len(article_start['abstract_links'])
+            link_position['abstract_link_position'] = [x+1 for x in occurences_abstract]
+
+        # occurences in subcategories
         occurences_categories = []
-        for key, val in article_start['categories_data']:
-            [article_start['abstract_links'] == article_next].index
-        occurences_subcategories = article_start['abstract_links'][article_start['abstract_links'] == article_next].index
-        occurences_tables = article_start['abstract_links'][article_start['abstract_links'] == article_next].index
+        words_prior = article_start['abstract_length'] 
+        for category in article_start['categories_data']:
+            occurences_category = category['h2_links'][category['h2_links'] == article_next].index.tolist()
+            words_prior += category['num_words']
+            if occurences_category:
+                occurences_categories.append(occurences_category)
+        '''occurences_subcategories = article_start['abstract_links'][article_start['abstract_links'] == article_next].index
+        occurences_tables = article_start['abstract_links'][article_start['abstract_links'] == article_next].index'''
 
-        link_position = {
-            'total_links': len(article_start['total_links']),
-            'article_link_position': [x+1 for x in occurences.tolist()],
-
-        }
+        # occurences in tables
 
         return link_position
     
@@ -549,4 +560,4 @@ class htmlParser:
                 if articles[a+1] == '<':
                     continue
                 else:
-                    print(self.find_link_position(no_back_clicks[a], no_back_clicks[a+1]))
+                    print(f'{no_back_clicks[a]}: {self.find_link_positions(no_back_clicks[a], no_back_clicks[a+1])}')
