@@ -63,8 +63,24 @@ def create_treemap_data(df):
 
 def analyze_categories_paths(df_paths, df_categories, omit_loops=False):
     """
-    Analyze the paths to find common paths.
-    Optionally omit consecutive repetitions of the same category in paths.
+    Analyze and summarize common category paths from article paths.
+
+    Parameters:
+        df_paths (pd.DataFrame): DataFrame containing article paths with a 'path' column. Each entry in 'path' represents a 
+            sequence of articles separated by semicolons.
+        df_categories (pd.DataFrame): DataFrame mapping articles to main categories, with 'article' and 'level_1' columns. 
+            'article' contains article names, and 'level_1' holds the primary category each article belongs to.
+        omit_loops (bool): Optional; if True, removes consecutive repetitions of the same category within a path. Defaults to False.
+
+    Returns:
+        pd.DataFrame: A DataFrame of the most common category paths, with columns:
+            - 'Category Path': The sequence of main categories (with optional loop removal).
+            - 'Count': Number of occurrences of each unique category path.
+
+    Notes:
+        - Paths are created by mapping each article in 'df_paths' to its primary category from 'df_categories'.
+        - If an article lacks a category, it remains unchanged in the path.
+        - Each path is represented as a string with categories separated by ' -> '.
     """
     # Map articles to main categories
     article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
@@ -96,6 +112,7 @@ def analyze_categories_paths(df_paths, df_categories, omit_loops=False):
     df_common_paths = pd.DataFrame(sorted_paths, columns=['Category Path', 'Count'])
     
     return df_common_paths
+
 
 def filter_most_specific_category(df_categories):
     """
@@ -240,16 +257,66 @@ def find_categories_start_end(paths, categories) :
 def voyage_sorting(paths, categories):
     """
     Filters paths into voyage or not voyage 
-
     Parameters:
         paths (DataFrame): DataFrame with a 'path' column
         categories (DataFrame): DataFrame with 'article' and 'category' columns
-
     Returns:
         DataFrame: paths with an additional 'voyage' column marked as True or False
     """    
     voyage_articles = categories[categories['category'].str.contains('Geography|Countries', regex=True)]['article'].unique()
     paths['voyage'] = paths['path'].apply(lambda p: any(article in p.split(';') for article in voyage_articles))
-
     # Display the filtered paths
     return paths
+
+def check_voyage_status(category_path, finished, n):
+    """
+    Check is the category path is voyage or not voyage, that is wether the first n categories visited are 'Geography' or 'Countries' 
+
+    Parameters:
+        category_paths (DataFrame): DataFrame with 'Category Path' column
+        finished (Boolean): whether it is a finished or not-finished path 
+        n (int): number of different categories following the first to consider 
+
+    Returns:
+        Boolean : is the path of category a voyage 
+    """    
+    # Split the category path
+    categories = category_path.split(' -> ')
+    path_len = len(categories)
+    
+    if finished : 
+        # Case 1: Path with 1 category -> always False
+        if path_len <= 2:
+            return False
+        # Case 2: Path length between 3 and n+2 -> check middle categories
+        elif 2 < path_len <= n + 2:
+            return any(category in categories[1:-1] for category in ['Geography', 'Countries'])
+        # Case 3: Path longer than n+2 -> check the first n categories after the first
+        else:
+            return any(category in categories[1:n+1] for category in ['Geography', 'Countries'])
+        
+    else : 
+        # Case 1: Path with 1 or 2 categories -> always False
+        if path_len <= 1:
+            return False
+        # Case 2: Path length between 3 and n+2 -> check middle categories
+        elif 1 < path_len <= n + 1:
+            return any(category in categories[1:] for category in ['Geography', 'Countries'])
+        # Case 3: Path longer than n+2 -> check the first n categories after the first
+        else:
+            return any(category in categories[1:n+1] for category in ['Geography', 'Countries'])    
+
+def voyage_sorting_category_path(category_paths, finished, n=3):
+    """
+    Adds a boolean column filtering paths into voyage or not voyage, that is whether the first n categories visited are 'Geography' or 'Countries' 
+
+    Parameters:
+        category_paths (DataFrame): DataFrame with 'Category Path' column
+        finished (Boolean): whetehr the paths are finished 
+        n (int): number of different categories following the first to consider 
+
+    Returns:
+        DataFrame: category paths with an additional 'voyage' column marked as True or False
+    """    
+    category_paths['voyage'] = category_paths['Category Path'].apply(lambda p: check_voyage_status(p, finished, n)) 
+    return category_paths 
