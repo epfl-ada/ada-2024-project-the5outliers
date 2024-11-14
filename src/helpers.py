@@ -66,11 +66,9 @@ def analyze_categories_paths(df_paths, df_categories, omit_loops=False):
     Analyze and summarize common category paths from article paths.
 
     Parameters:
-        df_paths (pd.DataFrame): DataFrame containing article paths with a 'path' column. Each entry in 'path' represents a 
-            sequence of articles separated by semicolons.
+        df_paths (pd.DataFrame): DataFrame containing article paths with a 'path' column. 
         df_categories (pd.DataFrame): DataFrame mapping articles to main categories, with 'article' and 'level_1' columns. 
-            'article' contains article names, and 'level_1' holds the primary category each article belongs to.
-        omit_loops (bool): Optional; if True, removes consecutive repetitions of the same category within a path. Defaults to False.
+        omit_loops (bool): Optional; if True, removes consecutive repetitions of the same category within a path. 
 
     Returns:
         pd.DataFrame: A DataFrame of the most common category paths, with columns:
@@ -112,7 +110,6 @@ def analyze_categories_paths(df_paths, df_categories, omit_loops=False):
     df_common_paths = pd.DataFrame(sorted_paths, columns=['Category Path', 'Count'])
     
     return df_common_paths
-
 
 def filter_most_specific_category(df_categories):
     """
@@ -230,20 +227,7 @@ def plot_position_interactive(df_position, plot_type="line", normalized=False):
     
     # Show the interactive plot
     fig.show()
-    
-def voyage_sorting(paths, categories):
-    """
-    Filters paths into voyage or not voyage 
-    Parameters:
-        paths (DataFrame): DataFrame with a 'path' column
-        categories (DataFrame): DataFrame with 'article' and 'category' columns
-    Returns:
-        DataFrame: paths with an additional 'voyage' column marked as True or False
-    """    
-    voyage_articles = categories[categories['category'].str.contains('Geography|Countries', regex=True)]['article'].unique()
-    paths['voyage'] = paths['path'].apply(lambda p: any(article in p.split(';') for article in voyage_articles))
-    # Display the filtered paths
-    return paths
+
 
 def check_voyage_status(category_path, finished, n):
     """
@@ -283,7 +267,7 @@ def check_voyage_status(category_path, finished, n):
         else:
             return any(category in categories[1:n+1] for category in ['Geography', 'Countries'])    
 
-def voyage_sorting_category_path(category_paths, finished, n=3):
+def category_voyage_sorting(category_paths, finished, n=3):
     """
     Adds a boolean column filtering paths into voyage or not voyage, that is whether the first n categories visited are 'Geography' or 'Countries' 
 
@@ -297,6 +281,38 @@ def voyage_sorting_category_path(category_paths, finished, n=3):
     """    
     category_paths['voyage'] = category_paths['Category Path'].apply(lambda p: check_voyage_status(p, finished, n)) 
     return category_paths 
+
+def game_voyage_sorting(df_article_paths, df_categories, finished, n=3):
+    """
+    Adds a boolean 'voyage' column to each game.
+    First maps articles to categories, then checks if the category path qualifies as a 'voyage'.
+
+    Parameters:
+        df_article_path (DataFrame): DataFrame with 'path' column containing article paths
+        df_categories (DataFrame): DataFrame with 'article' and 'level_1' columns for mapping
+        n (int): Number of different categories following the first to consider for voyage condition
+        finished (bool): Indicates whether the paths are finished 
+
+    Returns:
+        DataFrame: Original DataFrame with an additional 'voyage' column (True/False).
+    """
+    # Map articles to their main categories
+    article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
+    
+    # Convert article path to category path, omitting consecutive duplicates (loops)
+    def get_category_path(path):
+        articles = path.split(';')
+        categories = [article_to_category.get(article, article) for article in articles]
+        categories_no_loops = [cat for i, cat in enumerate(categories) if i == 0 or cat != categories[i - 1]]
+        return ' -> '.join(categories_no_loops)
+    
+    # Apply the transformation and check voyage status
+    df_article_paths['Category Path'] = df_article_paths['path'].apply(get_category_path)
+    df_article_paths['voyage'] = df_article_paths['Category Path'].apply(lambda p: check_voyage_status(p, finished, n))
+    
+    return df_article_paths
+
+
 def backtrack(paths) :
     """
     Compute the number of backtracks in each path.
