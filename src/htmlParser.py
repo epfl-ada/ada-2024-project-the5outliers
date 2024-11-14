@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 import pickle
 from urllib.parse import unquote
 import pandas as pd
-from data_loader import replace_back_clicks
+from src.data_loader import replace_back_clicks
 
 
 class htmlParser:
