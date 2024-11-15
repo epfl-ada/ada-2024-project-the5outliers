@@ -668,7 +668,7 @@ def plot_articles_pie_chart(df, abbreviations=None):
         autotext.set_fontsize(9)  # Change font size
 
     # Set the title of the plot
-    ax.set_title('Total Articles per Level 1 Category')
+    ax.set_title('Articles Distribution per Level 1 Category')
 
     # Place the legend outside the pie chart to avoid overlap
     ax.legend(
