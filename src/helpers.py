@@ -288,29 +288,36 @@ def get_position_frequencies(df, max_position=5):
 
     return position_data_df
 
-def plot_position_line(df_position, title="Category transitions frequencies across Path Positions"):
+def plot_position_line(df_position, df_article, title="Category transitions frequencies across Path Positions"):
     """
     Plot an interactive line plot of category frequencies across positions with both normalized and non-normalized views.
     
     Parameters:
         df_position (DataFrame): DataFrame with position frequencies for each category.
+        df_article (DataFrame): DataFrame containing article categories for dynamic palette generation.
+        title (str): Title of the plot.
     """
+    # Extract and sort categories
+    categories = sorted(df_article["category"].unique())
+    palette_category = sn.color_palette("tab20", len(categories))
+    
+    # Add black for the `<` category
+    categories.append("<")  # Add `<` to the category list
+    palette_category = [f"rgb({r*255},{g*255},{b*255})" for r, g, b in palette_category]
+    color_mapping = dict(zip(categories, palette_category))
+    color_mapping["<"] = "rgb(0,0,0)"  # Explicitly assign black to `<`
+    
     # Prepare data for normalized frequencies
     df_position_norm = df_position.copy()
     df_position_norm['Normalized Frequency'] = df_position_norm.groupby('Position')['Frequency'].transform(lambda x: (x / x.sum()) * 100)
-    
-    # Define a color map for categories
-    unique_categories = df_position['Category'].unique()
-    colors = px.colors.qualitative.Plotly  # Choose a color scheme
-    color_map = {category: colors[i % len(colors)] for i, category in enumerate(unique_categories)}
     
     # Create subplots with separate y-axes
     fig = make_subplots(
         rows=1, cols=2, subplot_titles=("Non-Normalized Frequencies", "Normalized Frequencies"),
         horizontal_spacing=0.05
     )
-    
     # Add non-normalized line plot traces
+    unique_categories = sorted(df_position['Category'].unique())
     for category in unique_categories:
         category_data = df_position[df_position['Category'] == category]
         fig.add_trace(
@@ -319,7 +326,7 @@ def plot_position_line(df_position, title="Category transitions frequencies acro
                 y=category_data['Frequency'],
                 mode="lines+markers",
                 name=category,
-                line=dict(color=color_map[category])
+                line=dict(color=color_mapping.get(category, "rgb(0,0,0)"))  # Use black as default if not mapped
             ), row=1, col=1
         )
     
@@ -332,7 +339,7 @@ def plot_position_line(df_position, title="Category transitions frequencies acro
                 y=category_data_norm['Normalized Frequency'],
                 mode="lines+markers",
                 name=category,
-                line=dict(color=color_map[category]),
+                line=dict(color=color_mapping.get(category, "rgb(0,0,0)")),
                 showlegend=False  # Show legend only on the first subplot
             ), row=1, col=2
         )
@@ -732,42 +739,4 @@ def plot_articles_pie_chart(df, abbreviations=None):
 
     # Display the pie chart
     plt.tight_layout()  # Adjust layout to ensure everything fits
-    plt.show()
-
-def plot_shortest_paths_matrix(df_shortest_path):
-
-    # Total number of article pairs
-    total_pairs = df_shortest_path.size
-
-    # Number of reachable pairs (distance from 1 to 9)
-    # Exclude self-pairs where distance is 0
-    # Unreachable pairs are represented by -1
-
-    # Create a mask for self-pairs (distance == 0)
-    self_pairs_mask = (df_shortest_path == 0)
-
-    # Create a mask for reachable pairs (distance between 1 and 9)
-    reachable_mask = (df_shortest_path >= 1) & (df_shortest_path <= 9)
-
-
-    reachable_pairs = np.count_nonzero(reachable_mask)
-    unreachable_pairs = np.count_nonzero(df_shortest_path == -1)
-
-    # Sparsity percentage: proportion of unreachable pairs
-    sparsity_percentage = ((unreachable_pairs + len(self_pairs_mask) ) / total_pairs) * 100
-
-    print(f"Total pairs: {total_pairs}")
-    print(f"Reachable pairs: {reachable_pairs}")
-    print(f"Unreachable pairs: {unreachable_pairs}")
-    print(f"Sparsity percentage: {sparsity_percentage:.2f}%")
-
-    # Create a binary matrix where 1 represents a reachable path and 0 represents an unreachable path
-    sparsity_matrix = np.where(df_shortest_path == -1, 0, 1)
-
-    plt.figure(figsize=(10, 8))
-    plt.imshow(sparsity_matrix, cmap='Greys', interpolation='nearest')
-    plt.title('Sparsity Pattern in Shortest Path Matrix')
-    plt.xlabel('Target Article')
-    plt.ylabel('Source Article')
-    plt.colorbar(label='Reachability (1=Reachable, 0=Unreachable)')
     plt.show()
