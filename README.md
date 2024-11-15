@@ -72,7 +72,7 @@ Week 5:
 git clone https://github.com/epfl-ada/ada-2024-project-the5outliers.git
 
 # create conda called 'ada_project' with all required packages
-conda create -f requirements.txt
+conda env create -f requirements.yml
 ```
 
 
