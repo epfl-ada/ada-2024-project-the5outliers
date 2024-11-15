@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap, BoundaryNorm
 import numpy as np
 import seaborn as sn
+import networkx as nx
 
 def create_treemap_data(df):
     """
@@ -65,7 +66,7 @@ def create_treemap_data(df):
 
     return labels, parents, values, ids
 
-def analyze_categories_paths(df_paths, df_categories, omit_loops=False):
+def analyze_categories_paths(df_paths, df_categories, users=True, omit_loops=False):
     """
     Analyze and summarize common category paths from article paths.
 
@@ -91,7 +92,9 @@ def analyze_categories_paths(df_paths, df_categories, omit_loops=False):
     path_counts = {}
     
     for path in df_paths['path']:
-        articles = path.split(';')
+        if users:
+            articles = path.split(';')
+        else: articles=path
         categories = [article_to_category.get(article, article) for article in articles]
 
         # Remove consecutive duplicate categories if omit_loops is True
@@ -114,6 +117,65 @@ def analyze_categories_paths(df_paths, df_categories, omit_loops=False):
     df_common_paths = pd.DataFrame(sorted_paths, columns=['Category Path', 'Count'])
     
     return df_common_paths
+
+def find_all_source_target_pairs(df_finished, df_unfinished, df_links):
+
+    optimal_paths = pd.DataFrame()
+    optimal_paths['source'] = df_finished['path'].apply(lambda x: x.split(';')[0])
+    optimal_paths['target'] = df_finished['path'].apply(lambda x: x.split(';')[-1])
+    df_unfinished['source'] = df_unfinished['path'].apply(lambda x: x.split(';')[0])
+    optimal_paths = pd.concat([optimal_paths, df_unfinished[['source', 'target']]], ignore_index=True)
+    optimal_paths = optimal_paths.drop_duplicates(subset=['source', 'target'])
+    # One pair source-target has an article which is not in links
+    # Get articles from both linkSource and linkTarget columns
+    unique_nodes = set(df_links['linkSource']).union(set(df_links['linkTarget']))
+    # Keep rows where both source and target are in the articles set
+    optimal_paths = optimal_paths[optimal_paths['source'].isin(unique_nodes) & optimal_paths['target'].isin(unique_nodes)]
+    return optimal_paths
+
+def find_shortest_path(row, G):
+    source, target = row['source'], row['target']
+    try:
+        # Use NetworkX to find the shortest path
+        path = nx.shortest_path(G, source=source, target=target)
+    except nx.NetworkXNoPath:
+        path = None  # If no path exists
+    return path
+
+def compare_with_matrix(row, df_shortest_path):
+    source, target = row['source'], row['target']
+    # Retrieve the corresponding matrix path length for source-target
+    matrix_length = df_shortest_path.loc[source, target]
+    
+    # Compute the path length from shortest_path, if it exists
+    computed_length = len(row['path']) - 1 if row['path'] is not None else -1
+    
+    matches_matrix = computed_length == matrix_length
+
+    return computed_length, matrix_length, matches_matrix
+
+def calculate_optimal_path(df_links, optimal_paths, df_shortest_path):
+    # Build the directed graph from the links
+    G = nx.DiGraph()
+    G.add_edges_from(df_links[['linkSource', 'linkTarget']].itertuples(index=False, name=None))
+
+    # Compute shortest paths and compare with matrix
+    optimal_paths['path'] = optimal_paths.apply(find_shortest_path, G=G, axis=1)
+    optimal_paths[['computed_length', 'matrix_length', 'matches_matrix']] = \
+        optimal_paths.apply(compare_with_matrix, df_shortest_path=df_shortest_path, axis=1, result_type='expand')
+
+    # Check if any values in the matches_matrix column are False
+    any_false = not optimal_paths['matches_matrix'].all()
+
+    if any_false:
+        print("There are pairs where computed path length does not match the expected path length.")
+    else:
+        print("All computed path lengths match the expected lengths.")
+    
+    optimal_paths = optimal_paths.dropna()
+
+    return optimal_paths
+
 
 def filter_most_specific_category(df_categories):
     """
