@@ -313,7 +313,7 @@ def plot_position_line(df_position, df_article, title="Category transitions freq
     
     # Create subplots with separate y-axes
     fig = make_subplots(
-        rows=1, cols=2, subplot_titles=("Non-Normalized Frequencies", "Normalized Frequencies"),
+        rows=1, cols=2, subplot_titles=("Non-Normalised Frequencies", "Frequencies Normalised by Number of Articles per Position"),
         horizontal_spacing=0.05
     )
     # Add non-normalized line plot traces
