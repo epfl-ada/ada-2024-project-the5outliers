@@ -143,7 +143,7 @@ def find_all_source_target_pairs(df_finished, df_unfinished, df_links):
     optimal_paths = optimal_paths.drop_duplicates(subset=['source', 'target'])
     
     # Ensure both source and target are in the set of nodes in df_links
-    unique_nodes = set(df_links['linkSource']).union(set(df_links['linkTarget'])
+    unique_nodes = set(df_links['linkSource']).union(set(df_links['linkTarget']))
     optimal_paths = optimal_paths[optimal_paths['source'].isin(unique_nodes) & optimal_paths['target'].isin(unique_nodes)]
     
     return optimal_paths
