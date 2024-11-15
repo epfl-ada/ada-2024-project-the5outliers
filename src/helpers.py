@@ -551,3 +551,67 @@ def transition_cat_matrix(df):
 
     plt.tight_layout()
     plt.show()
+
+def plot_articles_pie_chart(df, abbreviations=None):
+    """
+    Plots a simplified pie chart of the total number of articles per Level 1 category.
+
+    Parameters:
+    - df (DataFrame): The DataFrame containing 'article' and 'level_1' columns.
+    - abbreviations (dict, optional): A dictionary mapping full category names to abbreviations.
+    """
+    # Group by Level 1 category and count the number of articles
+    category_counts = df['level_1'].value_counts()
+
+    # Sort the categories by the article count in ascending order
+    category_counts = category_counts.sort_values(ascending=True)
+
+    # Handle small categories (less than 3%) by grouping them as 'Others'
+    threshold = 3  # percentage threshold
+    small_categories = category_counts[category_counts / category_counts.sum() * 100 < threshold]
+    small_categories_total = small_categories.sum()
+    large_categories = category_counts[category_counts / category_counts.sum() * 100 >= threshold]
+
+    # Add "Others" for small categories
+    if not small_categories.empty:
+        others = pd.Series({f'Others': small_categories_total})
+        large_categories = pd.concat([large_categories, others])
+
+    # Prepare the labels: Use abbreviations if provided
+    if abbreviations:
+        labels = [abbreviations.get(cat, cat) for cat in large_categories.index]
+        legend_labels = [f"{cat} ({abbreviations.get(cat, 'N/A')})" for cat in large_categories.index]
+    else:
+        labels = large_categories.index
+        legend_labels = labels
+
+    # Plot the pie chart
+    fig, ax = plt.subplots(figsize=(7, 7))
+    wedges, texts, autotexts = ax.pie(
+        large_categories, 
+        labels=labels, 
+        autopct='%1.1f%%', 
+        startangle=90,
+        pctdistance=0.8,
+    )
+
+    # Customize the font and color of the numbers
+    for autotext in autotexts:
+        autotext.set_fontsize(9)  # Change font size
+        autotext.set_fontweight('bold')  # Make the text bold
+
+    # Set the title of the plot
+    ax.set_title('Total Articles per Level 1 Category')
+
+    # Place the legend outside the pie chart to avoid overlap
+    ax.legend(
+        legend_labels, 
+        title="Categories", 
+        loc='center left', 
+        bbox_to_anchor=(1, 0.5), 
+        fontsize=10
+    )
+
+    # Display the pie chart
+    plt.tight_layout()  # Adjust layout to ensure everything fits
+    plt.show()
