@@ -456,12 +456,17 @@ def plot_cooccurrence_cat_matrix(df_categories, abbreviations=None):
     mask = np.triu(np.ones_like(matrix, dtype=bool), k=1) | (matrix == 0)
 
     # Plot the co-occurrence matrix
+
+    # Set up the color map for masked cells
+    cmap = sn.color_palette("YlGnBu", as_cmap=True)
+    cmap.set_bad(color='white')  # Set masked cells to appear white
+
     plt.figure(figsize=(10, 8))
     sn.heatmap(
         matrix,
         annot=True,
         fmt="g",
-        cmap="YlGnBu",
+        cmap=cmap,
         cbar_kws={'label': 'Number of Co-occurrences'},
         mask=mask,
         linewidths=0.5
@@ -534,6 +539,7 @@ def transition_cat_matrix(df):
     thresholds = [0, 100, 500, 1000, 5000, 10000, max_value]  # Adjust based on data range
     colors = ["#f0f0f0", "#a6bddb", "#3690c0", "#034e7b", "#feb24c", "#f03b20"]
     cmap = ListedColormap(colors)
+    cmap.set_bad(color='white')  # Set masked cells to appear white
     norm = BoundaryNorm(thresholds, len(colors))
 
 
