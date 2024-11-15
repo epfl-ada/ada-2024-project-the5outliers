@@ -4,10 +4,10 @@ import pickle
 from urllib.parse import unquote
 from tqdm import tqdm
 from bs4 import BeautifulSoup
-from src.data_loader import replace_back_clicks
+from src.data.data_loader import replace_back_clicks
 
 
-class htmlParser:
+class HTMLParser:
     def __init__(self, filepath='./data/articles_html/wp'):
         self.article_URLs = [] # full article paths
         for subdir, dirs, files in os.walk(filepath):

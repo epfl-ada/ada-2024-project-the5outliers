@@ -152,7 +152,7 @@ def category_jaccard_similarity(categories, level_weights):
 
 def compute_save_all():
     '''Call this function from the base of the repo. Computes article embeddings and the two similarity matrices and saves them to data.'''
-    from src.data_loader import read_articles , read_categories
+    from data.data_loader import read_articles , read_categories
 
     df_article_names = read_articles()
 
