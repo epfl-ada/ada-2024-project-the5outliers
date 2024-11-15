@@ -76,7 +76,7 @@ def analyze_edge_weights(G):
 
     # Plot the distribution of edge weights
     plt.figure(figsize=(8, 6))
-    plt.hist(edge_weights, bins=30, color="skyblue", edgecolor="black")
+    plt.hist(edge_weights, bins=50, color="skyblue", edgecolor="black")
     plt.xlabel("Edge Weight")
     plt.ylabel("Frequency")
     plt.title("Distribution of Edge Weights")

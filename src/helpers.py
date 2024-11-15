@@ -604,7 +604,6 @@ def plot_articles_pie_chart(df, abbreviations=None):
     # Customize the font and color of the numbers
     for autotext in autotexts:
         autotext.set_fontsize(9)  # Change font size
-        autotext.set_fontweight('bold')  # Make the text bold
 
     # Set the title of the plot
     ax.set_title('Total Articles per Level 1 Category')
