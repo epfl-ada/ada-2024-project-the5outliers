@@ -69,22 +69,17 @@ Week 5:
 
 ```bash
 # clone project
-git clone https://github.com/epfl-ada/ada-2024-project-the5outliers.git)
+git clone https://github.com/epfl-ada/ada-2024-project-the5outliers.git
 
-# create conda environment
-conda create -n <env_name> python=3.11 or ...
-conda activate <env_name>
-
-
-# install requirements
-pip install -r pip_requirements.txt
+# create conda called 'ada_project' with all required packages
+conda create -f requirements.txt
 ```
 
 
 
 <h3 style= "color: #c7c9cf"> How to use the library </h3> 
 
-All the results are in the ```results.ipynb```. Running the notebook will showcase the different functionalities and models defined under src
+All the results are in the ```results.ipynb```. Running the notebook will showcase the different functionalities and models defined under src.
 
 
 
@@ -99,11 +94,10 @@ The directory structure of new project looks like this:
 │   ├── data                            <- Data directory
 │   ├── models                          <- Model directory
 │   ├── utils                           <- Utility directory
-│   ├── scripts                         <- Shell scripts
 │
 ├── results.ipynb               <- a well-structured notebook showing the results
 │
 ├── .gitignore                  <- List of files ignored by git
-├── pip_requirements.txt        <- File for installing python dependencies
+├── requirements.txt            <- File for installing python dependencies
 └── README.md
 ```
