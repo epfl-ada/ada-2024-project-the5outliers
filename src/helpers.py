@@ -66,6 +66,62 @@ def create_treemap_data(df):
 
     return labels, parents, values, ids
 
+def get_main_categories_paths(df_paths, df_categories, users=True, omit_loops=False):
+    """
+    Give common category paths from article paths and start-end categories.
+
+    Parameters:
+        df_paths (pd.DataFrame): DataFrame containing article paths with a 'path' column. 
+        df_categories (pd.DataFrame): DataFrame mapping articles to main categories, with 'article' and 'level_1' columns. 
+        omit_loops (bool): Optional; if True, removes consecutive repetitions of the same category within a path. 
+
+    Returns:
+        pd.DataFrame: A DataFrame of the most common category paths, with columns:
+            - 'Category Path': The sequence of main categories (with optional loop removal).
+            - 'start_maincategory': The main category of the start.
+            - 'end_maincategory': The main category of the end.
+            
+    Notes:
+        - Paths are created by mapping each article in 'df_paths' to its primary category from 'df_categories'.
+        - If an article lacks a category, it remains unchanged in the path.
+        - Each path is represented as a string with categories separated by ' -> '.
+    """
+    # Map articles to main categories
+    article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
+    
+    category_paths = []
+    start_categories = []
+    end_categories = []
+    
+    for path in df_paths['path']:
+        if users:
+            articles = path.split(';')
+        else:
+            articles = path
+        categories = [article_to_category.get(article, article) for article in articles]
+
+        # Remove consecutive duplicate categories if omit_loops is True
+        if omit_loops:
+            categories = [category for i, category in enumerate(categories) 
+                          if i == 0 or category != categories[i - 1]]
+
+        # Create a string representation of the category path
+        category_path = ' -> '.join(categories)
+        category_paths.append(category_path)
+        
+        # Extract start and end categories
+        start_categories.append(categories[0] if categories else None)
+        end_categories.append(categories[-1] if categories else None)
+    
+    # Create DataFrame from the collected category paths
+    df_common_paths = pd.DataFrame({
+        'Category Path': category_paths,
+        'start_maincategory': start_categories,
+        'end_maincategory': end_categories
+    })
+    
+    return df_common_paths
+    
 def analyze_categories_paths(df_paths, df_categories, users=True, omit_loops=False):
     """
     Analyze and summarize common category paths from article paths.
@@ -226,7 +282,6 @@ def calculate_optimal_path(df_links, optimal_paths, df_shortest_path):
     optimal_paths = optimal_paths.dropna()
 
     return optimal_paths
-
 
 def filter_most_specific_category(df_categories):
     """
@@ -408,24 +463,32 @@ def plot_normalized_position_bar(df_position, title="Normalized Category Frequen
     
     # Show the interactive plot
     fig.show()
-
-def check_voyage_status(category_path, finished, n):
+    
+def check_voyage_status(paths, finished, n):
     """
-    Check is the category path is voyage or not voyage, that is wether the first n categories visited are 'Geography' or 'Countries' 
+    Check if the category path is voyage or not voyage, that is whether the first n categories after the first are 'Geography' or 'Countries'. 
 
     Parameters:
-        category_paths (DataFrame): DataFrame with 'Category Path' column
-        finished (Boolean): whether it is a finished or not-finished path 
-        n (int): number of different categories following the first to consider 
+        paths (str): A category path in the form 'Geography -> Countries -> Geography'.
+        finished (bool): Whether the path is finished or not finished.
+        n (int): Number of different categories following the first to consider.
 
     Returns:
-        Boolean : is the path of category a voyage 
+        bool: True if the path is a 'voyage', False otherwise.
     """    
+    # Ensure that paths is a string
+    if not isinstance(paths, str):
+        return False  # Return False for invalid paths
+
     # Split the category path
-    categories = category_path.split(' -> ')
+    categories = paths.split(' -> ')
     path_len = len(categories)
     
-    if finished : 
+    # Exclude paths that start with "Countries" or "Geography"
+    if categories[0] in ['Geography', 'Countries']:
+        return False
+    
+    if finished: 
         # Case 1: Path with 1 category -> always False
         if path_len <= 2:
             return False
@@ -436,7 +499,7 @@ def check_voyage_status(category_path, finished, n):
         else:
             return any(category in categories[1:n+1] for category in ['Geography', 'Countries'])
         
-    else : 
+    else: 
         # Case 1: Path with 1 or 2 categories -> always False
         if path_len <= 1:
             return False
@@ -445,11 +508,11 @@ def check_voyage_status(category_path, finished, n):
             return any(category in categories[1:] for category in ['Geography', 'Countries'])
         # Case 3: Path longer than n+2 -> check the first n categories after the first
         else:
-            return any(category in categories[1:n+1] for category in ['Geography', 'Countries'])    
+            return any(category in categories[1:n+1] for category in ['Geography', 'Countries'])
 
 def category_voyage_sorting(category_paths, finished, n=3):
     """
-    Adds a boolean column filtering paths into voyage or not voyage, that is whether the first n categories visited are 'Geography' or 'Countries' 
+    Adds a boolean column filtering paths into voyage or not voyage, that is whether the first n categories after the first are 'Geography' or 'Countries' 
 
     Parameters:
         category_paths (DataFrame): DataFrame with 'Category Path' column
@@ -465,7 +528,7 @@ def category_voyage_sorting(category_paths, finished, n=3):
 def game_voyage_sorting(df_article_paths, df_categories, finished, n=3):
     """
     Adds a boolean 'voyage' column to each game.
-    First maps articles to categories, then checks if the category path qualifies as a 'voyage'.
+    First maps articles to categories (requirement for using check_voyage_status()), then checks if the category path qualifies as a 'voyage'.
 
     Parameters:
         df_article_path (DataFrame): DataFrame with 'path' column containing article paths
@@ -479,18 +542,88 @@ def game_voyage_sorting(df_article_paths, df_categories, finished, n=3):
     # Map articles to their main categories
     article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
     
-    # Convert article path to category path, omitting consecutive duplicates (loops)
-    def get_category_path(path):
-        articles = path.split(';')
-        categories = [article_to_category.get(article, article) for article in articles]
-        categories_no_loops = [cat for i, cat in enumerate(categories) if i == 0 or cat != categories[i - 1]]
-        return ' -> '.join(categories_no_loops)
+    category_path_df = get_main_categories_paths(df_article_paths, df_categories, omit_loops=True)
     
     # Apply the transformation and check voyage status
-    df_article_paths['Category Path'] = df_article_paths['path'].apply(get_category_path)
+    df_article_paths['Category Path'] = category_path_df['Category Path']
+    df_article_paths['start_maincategory'] = category_path_df['start_maincategory']
+    df_article_paths['end_maincategory'] = category_path_df['end_maincategory']
     df_article_paths['voyage'] = df_article_paths['Category Path'].apply(lambda p: check_voyage_status(p, finished, n))
     
     return df_article_paths
+
+def plot_sankey_voyage(paths):
+    """
+    Plots a Sankey diagram to visualize the distribution of paths classified as 'Voyage' or 'Non-Voyage'.
+
+    Parameters:
+        paths (DataFrame): DataFrame containing 'voyage' and 'start_maincategory', 'end_maincategory'  columns
+
+    Returns:
+        None: it displays the Sankey diagram 
+    """
+    
+    # Mapping for start, voyage, and end nodes
+    paths['start_category_label'] = paths['start_maincategory'].apply(lambda x: 'First in Countries/Geography' if x in ['Countries', 'Geography'] else 'First not in Countries/Geography')#####pro
+    paths['end_category_label'] = paths['end_maincategory'].apply(lambda x: 'Target in Countries/Geography' if x in ['Countries', 'Geography'] else 'Target not in Countries/Geography')
+    paths['voyage_label'] = paths['voyage'].apply(lambda x: 'Voyage' if x else 'Non-Voyage')
+
+    # Start→Voyage flows
+    start_voyage_flows = paths.groupby(['start_category_label', 'voyage_label']).size().reset_index(name='count')
+
+    # Voyage→End flows
+    voyage_end_flows = paths.groupby(['voyage_label', 'end_category_label']).size().reset_index(name='count')
+
+    # Define node labels
+    labels = ['First in Countries/Geography', 'First not in Countries/Geography',
+              'Voyage', 'Non-Voyage',
+              'Target in Countries/Geography', 'Target not in Countries/Geography']
+
+    # Create mappings for source and target node indices
+    label_map = {label: i for i, label in enumerate(labels)}
+
+    # Initialize lists for diagram data
+    sources = []
+    targets = []
+    values = []
+
+    # Add Start→Voyage flows
+    for _, row in start_voyage_flows.iterrows():
+        sources.append(label_map[row['start_category_label']])
+        targets.append(label_map[row['voyage_label']])
+        values.append(row['count'])
+
+    # Add Voyage→End flows
+    for _, row in voyage_end_flows.iterrows():
+        sources.append(label_map[row['voyage_label']])
+        targets.append(label_map[row['end_category_label']])
+        values.append(row['count'])
+
+    # Define node colors
+    node_colors = [
+        "rgba(0, 128, 128, 0.6)",  # First in Countries/Geography
+        "rgba(244, 109, 67, 0.8)",  # First not in Countries/Geography
+        "rgba(0, 128, 128, 0.6)",  # Voyage
+        "rgba(244, 109, 67, 0.8)",  # Non-Voyage
+        "rgba(0, 128, 128, 0.6)",  # Target in Countries/Geography
+        "rgba(244, 109, 67, 0.8)"  # Target not in Countries/Geography
+    ]
+
+    # Create the Sankey diagram
+    fig = go.Figure(data=[go.Sankey(
+        node=dict(pad=15, thickness=20, line=dict(color="white", width=0.1), label=labels, color=node_colors),
+        link=dict(source=sources, target=targets, value=values)
+    )])
+    
+    fig.update_layout(
+        title_text="Voyage and Non-Voyage Paths",
+        font_size=10,
+        title_font_size=14,
+        title_x=0.5,
+        plot_bgcolor="white"
+    )
+    
+    fig.show()
 
 def backtrack(paths) :
     """
