@@ -225,4 +225,4 @@ def replace_back_clicks(path):
             consecutive_backclicks=0
             resolved_path.append(art)
     
-    return resolved_path
+    return ';'.join(resolved_path)

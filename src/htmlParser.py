@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 import pickle
 from urllib.parse import unquote
 import pandas as pd
-from data_loader import replace_back_clicks
+from src.data_loader import replace_back_clicks
 
 
 class htmlParser:
@@ -333,7 +333,7 @@ class htmlParser:
 
         for path in df_paths.sample(1, random_state=2)['path']:
             articles = path.split(';')
-            no_back_clicks = replace_back_clicks(path)
+            no_back_clicks = replace_back_clicks(path).split(';')
             print(articles)
             print(no_back_clicks)
             
