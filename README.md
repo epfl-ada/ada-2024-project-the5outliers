@@ -53,7 +53,7 @@ No additional datasets are needed to answer the research questions.
 
 Step 1 (due to 24.11): Core analysis on the voyage vs non-voyage categories, including correlations with difficulty metrics and similarity analysis.
 
-Step 2 (due to 01.12): In-deep compairison between user path and optimal path, look for significant differences in geography and country categories.
+Step 2 (due to 01.12): In-depth compairison between user path and optimal path, look for significant differences in geography and country categories.
 
 Step 3 (due to 08.12): Selection of pertinent results for the website, create interactive plots and redaction of the story.
 
