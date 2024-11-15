@@ -1,9 +1,9 @@
-from tqdm import tqdm
 import os
-from bs4 import BeautifulSoup
+import pandas as pd
 import pickle
 from urllib.parse import unquote
-import pandas as pd
+from tqdm import tqdm
+from bs4 import BeautifulSoup
 from src.data_loader import replace_back_clicks
 
 

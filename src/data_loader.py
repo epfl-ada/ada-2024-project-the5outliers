@@ -147,8 +147,8 @@ def read_unfinished_paths():
     len_df = len(df)
     ## Drop rows where 'type' is 'timeout' and 'durationInSec' is less than 1800
     df = df[~((df['type'] == 'timeout') & (df['durationInSec'] < 1800))].reset_index(drop=True)
-    print("Number of rows dropped of type 'timeout' with a duration less than 30 minutes:", len_df - len(df))
-    print("Type 'timeout' occurs only after 30 minutes of inactivity, thus this path are technically impossible.")
+    print("Number of rows dropped of type 'timeout' with a duration less than 30 minutes:", len_df - len(df), 
+          "Type 'timeout' occurs only after 30 minutes of inactivity, thus this path are technically impossible.")
 
     print("Number of rows after filtering:", len(df),"\n")
 
@@ -225,4 +225,5 @@ def replace_back_clicks(path):
             consecutive_backclicks=0
             resolved_path.append(art)
     
+    # Join the resolved path with ';' as a separator
     return ';'.join(resolved_path)
