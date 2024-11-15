@@ -31,7 +31,7 @@ $$J(A, B)=\frac{|A \cap B|}{|A \cup B|}$$
 <h3 style= "color: #c7c9cf"> HTML parsing </h3>
 Parsing allows to find interesting features of the wikipedia articles: the number of words and links, and hence the link density. It also gives structural information about the pages: categories, subcategories, the presence and nature of tables. For each of these structures, the number of words and the list of present links is reported. 
 
-<h3 style= "color: #c7c9cf"> Networks and Graph </h3>
+<h3 style= "color: #c7c9cf"> Networks and Graphs </h3>
 
 Networks are particularly useful for representation of complex relations between for example categories or category transitions.
 
@@ -46,9 +46,9 @@ Furthermore, they are used as clustering for the similarity measures: reordering
 
 1. Statistical analysis of article features. 
 2. Networks: centrality based on the connections between articles in certain categories and centrality based on the flow between categories from user paths.
-3. Aggregate categories and check if they pass through geography or country.
+3. Aggregate categories and verify if they pass through geography or country.
 4. Compare key factors for the voyage and non-voyage paths: for subsets of similar paths (e.g. same start and end category), compare the difficulty experiences by the player, the duration and length of the game and the ideal path. 
-5. Includes similarity analysis on paths (eventually with interpolation to compare paths of different lengths), showing whether users zoom out more from a semantic cluser in voyages.
+5. Includes similarity analysis on paths (eventually with interpolation to compare paths of different lengths), showing whether users zoom out more from a semantic cluster in voyages.
 6. Explore different possible confounfing factors between human *navigation* and human *reasoning*, evaluate if users pass through geography and countries significantly more than needed and more than other categories, considering the optimal paths.
 
 
@@ -60,7 +60,7 @@ No additional datasets are needed to answer the research questions.
 
 Step 1 (due to 24.11): Core analysis on the voyage vs non-voyage categories, including correlations with difficulty metrics and similarity analysis.
 
-Step 2 (due to 01.12): In-depth compairison between user path and optimal path, look for significant differences in geography and country categories.
+Step 2 (due to 01.12): In-depth comparison between user path and optimal path, look for significant differences in geography and country categories.
 
 Step 3 (due to 08.12): Selection of pertinent results for the website, create interactive plots and redaction of the story.
 
@@ -68,7 +68,7 @@ Step 4 (due to 20.12): Build the website.
 
 <h2 style= "color: #c7c9cf"> Organization within the team </h2> 
 
-Our team of five works collaboratively, contributing equally to the project by pairing up for tasks to ensure thorough double-checking, and rotating pairs when switching tasks. In the end, each of us actively participates in both the analysis and the building of the website.
+Our team of five works collaboratively, contributing equally to the project by pairing up for tasks to ensure double-checking, and rotating pairs when switching tasks. In the end, each of us actively participates in both the analysis and the building of the website.
 
 <h2 style= "color: #c7c9cf"> References </h2> 
 [1] Jianlv Chen and Shitao Xiao and Peitian Zhang and Kun Luo and Defu Lian and Zheng Liu. BGE M3-Embedding: Multi-Lingual, Multi-Functionality, Multi-Granularity Text Embeddings Through Self-Knowledge Distillation. <i>arXiv</i>, 2024.
