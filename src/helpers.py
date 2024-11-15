@@ -175,42 +175,94 @@ def analyze_categories_paths(df_paths, df_categories, users=True, omit_loops=Fal
     return df_common_paths
 
 def find_all_source_target_pairs(df_finished, df_unfinished, df_links):
+    """
+    Extracts and deduplicates all source-target pairs from finished and unfinished paths,
+    ensuring both nodes exist in the links dataset.
 
+    Args:
+        df_finished (pd.DataFrame): DataFrame containing finished paths, where 'path' is a 
+                                    semicolon-separated string of nodes.
+        df_unfinished (pd.DataFrame): DataFrame containing unfinished paths, where 'path' is a 
+                                       semicolon-separated string of nodes.
+        df_links (pd.DataFrame): DataFrame containing graph links with 'linkSource' and 
+                                 'linkTarget' columns.
+
+    Returns:
+        pd.DataFrame: DataFrame with unique source-target pairs where both nodes exist in 
+                      the set of nodes defined by df_links.
+    """
     optimal_paths = pd.DataFrame()
     optimal_paths['source'] = df_finished['path'].apply(lambda x: x.split(';')[0])
     optimal_paths['target'] = df_finished['path'].apply(lambda x: x.split(';')[-1])
     df_unfinished['source'] = df_unfinished['path'].apply(lambda x: x.split(';')[0])
     optimal_paths = pd.concat([optimal_paths, df_unfinished[['source', 'target']]], ignore_index=True)
     optimal_paths = optimal_paths.drop_duplicates(subset=['source', 'target'])
-    # One pair source-target has an article which is not in links
-    # Get articles from both linkSource and linkTarget columns
+    
+    # Ensure both source and target are in the set of nodes in df_links
     unique_nodes = set(df_links['linkSource']).union(set(df_links['linkTarget']))
-    # Keep rows where both source and target are in the articles set
     optimal_paths = optimal_paths[optimal_paths['source'].isin(unique_nodes) & optimal_paths['target'].isin(unique_nodes)]
+    
     return optimal_paths
 
+
 def find_shortest_path(row, G):
+    """
+    Finds the shortest path between the source and target nodes in a graph.
+
+    Args:
+        row (pd.Series): A row containing 'source' and 'target' nodes.
+        G (networkx.DiGraph): A directed graph built using NetworkX.
+
+    Returns:
+        list or None: The shortest path as a list of nodes if it exists; otherwise None.
+    """
     source, target = row['source'], row['target']
     try:
-        # Use NetworkX to find the shortest path
         path = nx.shortest_path(G, source=source, target=target)
     except nx.NetworkXNoPath:
         path = None  # If no path exists
     return path
 
+
 def compare_with_matrix(row, df_shortest_path):
+    """
+    Compares the computed shortest path length with the expected length from a matrix.
+
+    Args:
+        row (pd.Series): A row containing 'source', 'target', and 'path' information.
+        df_shortest_path (pd.DataFrame): A DataFrame containing the shortest path lengths 
+                                         between all source-target pairs.
+
+    Returns:
+        tuple: A tuple containing:
+               - computed_length (int): The length of the computed shortest path.
+               - matrix_length (int): The length of the shortest path from the matrix.
+               - matches_matrix (bool): Whether the computed and matrix lengths match.
+    """
     source, target = row['source'], row['target']
-    # Retrieve the corresponding matrix path length for source-target
     matrix_length = df_shortest_path.loc[source, target]
-    
-    # Compute the path length from shortest_path, if it exists
     computed_length = len(row['path']) - 1 if row['path'] is not None else -1
-    
     matches_matrix = computed_length == matrix_length
 
     return computed_length, matrix_length, matches_matrix
 
+
 def calculate_optimal_path(df_links, optimal_paths, df_shortest_path):
+    """
+    Computes the shortest paths for all source-target pairs and compares them to 
+    the expected lengths from a matrix.
+
+    Args:
+        df_links (pd.DataFrame): DataFrame containing graph links with 'linkSource' and 
+                                 'linkTarget' columns.
+        optimal_paths (pd.DataFrame): DataFrame with source-target pairs to evaluate.
+        df_shortest_path (pd.DataFrame): DataFrame containing the shortest path lengths 
+                                         between all source-target pairs.
+
+    Returns:
+        pd.DataFrame: DataFrame with computed paths, path lengths, and comparison results. 
+                      Rows with mismatched path lengths are included.
+    """
     # Build the directed graph from the links
     G = nx.DiGraph()
     G.add_edges_from(df_links[['linkSource', 'linkTarget']].itertuples(index=False, name=None))
@@ -222,7 +274,6 @@ def calculate_optimal_path(df_links, optimal_paths, df_shortest_path):
 
     # Check if any values in the matches_matrix column are False
     any_false = not optimal_paths['matches_matrix'].all()
-
     if any_false:
         print("There are pairs where computed path length does not match the expected path length.")
     else:
@@ -292,29 +343,36 @@ def get_position_frequencies(df, max_position=5):
 
     return position_data_df
 
-def plot_position_line(df_position, title="Category transitions frequencies across Path Positions"):
+def plot_position_line(df_position, df_article, title="Category transitions frequencies across Path Positions"):
     """
     Plot an interactive line plot of category frequencies across positions with both normalized and non-normalized views.
     
     Parameters:
         df_position (DataFrame): DataFrame with position frequencies for each category.
+        df_article (DataFrame): DataFrame containing article categories for dynamic palette generation.
+        title (str): Title of the plot.
     """
+    # Extract and sort categories
+    categories = sorted(df_article["category"].unique())
+    palette_category = sn.color_palette("tab20", len(categories))
+    
+    # Add black for the `<` category
+    categories.append("<")  # Add `<` to the category list
+    palette_category = [f"rgb({r*255},{g*255},{b*255})" for r, g, b in palette_category]
+    color_mapping = dict(zip(categories, palette_category))
+    color_mapping["<"] = "rgb(0,0,0)"  # Explicitly assign black to `<`
+    
     # Prepare data for normalized frequencies
     df_position_norm = df_position.copy()
     df_position_norm['Normalized Frequency'] = df_position_norm.groupby('Position')['Frequency'].transform(lambda x: (x / x.sum()) * 100)
     
-    # Define a color map for categories
-    unique_categories = df_position['Category'].unique()
-    colors = px.colors.qualitative.Plotly  # Choose a color scheme
-    color_map = {category: colors[i % len(colors)] for i, category in enumerate(unique_categories)}
-    
     # Create subplots with separate y-axes
     fig = make_subplots(
-        rows=1, cols=2, subplot_titles=("Non-Normalized Frequencies", "Normalized Frequencies"),
+        rows=1, cols=2, subplot_titles=("Non-Normalised Frequencies", "Frequencies Normalised by Number of Articles per Position"),
         horizontal_spacing=0.05
     )
-    
     # Add non-normalized line plot traces
+    unique_categories = sorted(df_position['Category'].unique())
     for category in unique_categories:
         category_data = df_position[df_position['Category'] == category]
         fig.add_trace(
@@ -323,7 +381,7 @@ def plot_position_line(df_position, title="Category transitions frequencies acro
                 y=category_data['Frequency'],
                 mode="lines+markers",
                 name=category,
-                line=dict(color=color_map[category])
+                line=dict(color=color_mapping.get(category, "rgb(0,0,0)"))  # Use black as default if not mapped
             ), row=1, col=1
         )
     
@@ -336,7 +394,7 @@ def plot_position_line(df_position, title="Category transitions frequencies acro
                 y=category_data_norm['Normalized Frequency'],
                 mode="lines+markers",
                 name=category,
-                line=dict(color=color_map[category]),
+                line=dict(color=color_mapping.get(category, "rgb(0,0,0)")),
                 showlegend=False  # Show legend only on the first subplot
             ), row=1, col=2
         )
@@ -688,7 +746,7 @@ def plot_cooccurrence_cat_matrix(df_categories, abbreviations=None):
     plt.title("Co-occurrence of Level 1 Categories in Articles with Main Category Suggestion")
     plt.xlabel("Level 1 Category")
     plt.ylabel("Level 1 Category")
-    plt.xticks(rotation=0, ha="right", fontsize=10)
+    plt.xticks(rotation=0, fontsize=10)
     plt.yticks(fontsize=10, rotation=0)
 
     # Add an enhanced legend for abbreviations
@@ -801,7 +859,7 @@ def plot_articles_pie_chart(df, abbreviations=None):
         autotext.set_fontsize(9)  # Change font size
 
     # Set the title of the plot
-    ax.set_title('Total Articles per Level 1 Category')
+    ax.set_title('Articles Distribution per Level 1 Category')
 
     # Place the legend outside the pie chart to avoid overlap
     ax.legend(
@@ -814,4 +872,42 @@ def plot_articles_pie_chart(df, abbreviations=None):
 
     # Display the pie chart
     plt.tight_layout()  # Adjust layout to ensure everything fits
+    plt.show()
+    
+def plot_shortest_paths_matrix(df_shortest_path):
+
+    # Total number of article pairs
+    total_pairs = df_shortest_path.size
+
+    # Number of reachable pairs (distance from 1 to 9)
+    # Exclude self-pairs where distance is 0
+    # Unreachable pairs are represented by -1
+
+    # Create a mask for self-pairs (distance == 0)
+    self_pairs_mask = (df_shortest_path == 0)
+
+    # Create a mask for reachable pairs (distance between 1 and 9)
+    reachable_mask = (df_shortest_path >= 1) & (df_shortest_path <= 9)
+
+
+    reachable_pairs = np.count_nonzero(reachable_mask)
+    unreachable_pairs = np.count_nonzero(df_shortest_path == -1)
+
+    # Sparsity percentage: proportion of unreachable pairs
+    sparsity_percentage = ((unreachable_pairs + len(self_pairs_mask) ) / total_pairs) * 100
+
+    print(f"Total pairs: {total_pairs}")
+    print(f"Reachable pairs: {reachable_pairs}")
+    print(f"Unreachable pairs: {unreachable_pairs}")
+    print(f"Sparsity percentage: {sparsity_percentage:.2f}%")
+
+    # Create a binary matrix where 1 represents a reachable path and 0 represents an unreachable path
+    sparsity_matrix = np.where(df_shortest_path == -1, 0, 1)
+
+    plt.figure(figsize=(10, 8))
+    plt.imshow(sparsity_matrix, cmap='Greys', interpolation='nearest')
+    plt.title('Sparsity Pattern in Shortest Path Matrix')
+    plt.xlabel('Target Article')
+    plt.ylabel('Source Article')
+    plt.colorbar(label='Reachability (1=Reachable, 0=Unreachable)')
     plt.show()
