@@ -46,7 +46,7 @@ Furthermore, they are used as clustering for the similarity measures: reordering
 
 1. Statistical analysis of article features. 
 2. Networks: centrality based on the connections between articles in certain categories and centrality based on the flow between categories from user paths.
-3. Aggregate categories and check if they pass through geography or country.
+3. Aggregate categories and verify if they pass through geography or country.
 4. Compare key factors for the voyage and non-voyage paths: for subsets of similar paths (e.g. same start and end category), compare the difficulty experiences by the player, the duration and length of the game and the ideal path. 
 5. Includes similarity analysis on paths (eventually with interpolation to compare paths of different lengths), showing whether users zoom out more from a semantic cluser in voyages.
 6. Explore different possible confounfing factors between human *navigation* and human *reasoning*, evaluate if users pass through geography and countries significantly more than needed and more than other categories, considering the optimal paths.
