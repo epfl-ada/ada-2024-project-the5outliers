@@ -169,6 +169,7 @@ def read_finished_paths():
     valid_articles.add("<")
 
     invalid_articles_set = set()
+
     def check_path(path):
         articles = path.split(';')
         for article in articles:
@@ -177,7 +178,11 @@ def read_finished_paths():
                 invalid_articles_set.add(article)  
                 return False  # Exclude this row if any article is invalid
         return True  # Include this row if all articles are valid
+    
     df = df[df["path"].apply(check_path)].reset_index(drop=True)
+    df = df[~((df['durationInSec'] == 0) & (df['rating'].isnull()))]
+    df['rating'] = df['rating'].fillna('NaN')
+    df.reset_index(drop=True, inplace=True)
     print("Invalid articles found in path:", invalid_articles_set)
     print("Number of rows after filtering:", len(df),"\n")
     
