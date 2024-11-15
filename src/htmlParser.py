@@ -279,8 +279,8 @@ class htmlParser:
                 'abstract_words': art['abstract_length'],
                 'abstract_links': len(art['abstract_links']),
                 'abstract_link_density': len(art['abstract_links']) / art['abstract_length'],
-                'num_categories': len(art['categories_data']),
-                'num_subcategories': sum(len(cat.get('subcategories', [])) for cat in art['categories_data']),
+                'num_sections': len(art['categories_data']),
+                'num_subsections': sum(len(cat.get('subcategories', [])) for cat in art['categories_data']),
                 'num_tables': len(art['tables'])
             }
             articles_stats.append(article_stats)

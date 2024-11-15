@@ -15,7 +15,7 @@ def build_network(df_paths, df_categories, include_self_loops=True):
     G = nx.DiGraph()
 
     # Build the network with main categories and aggregate edge weights
-    for path in df_paths['path']:
+    for path in df_paths:
         nodes = path.split(';')
         # Map articles to their main categories
         main_category_nodes = [article_to_main_category.get(node, node) for node in nodes]
