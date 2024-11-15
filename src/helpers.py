@@ -682,3 +682,41 @@ def plot_articles_pie_chart(df, abbreviations=None):
     # Display the pie chart
     plt.tight_layout()  # Adjust layout to ensure everything fits
     plt.show()
+
+def plot_shortest_paths_matrix(df_shortest_path):
+
+    # Total number of article pairs
+    total_pairs = df_shortest_path.size
+
+    # Number of reachable pairs (distance from 1 to 9)
+    # Exclude self-pairs where distance is 0
+    # Unreachable pairs are represented by -1
+
+    # Create a mask for self-pairs (distance == 0)
+    self_pairs_mask = (df_shortest_path == 0)
+
+    # Create a mask for reachable pairs (distance between 1 and 9)
+    reachable_mask = (df_shortest_path >= 1) & (df_shortest_path <= 9)
+
+
+    reachable_pairs = np.count_nonzero(reachable_mask)
+    unreachable_pairs = np.count_nonzero(df_shortest_path == -1)
+
+    # Sparsity percentage: proportion of unreachable pairs
+    sparsity_percentage = ((unreachable_pairs + len(self_pairs_mask) ) / total_pairs) * 100
+
+    print(f"Total pairs: {total_pairs}")
+    print(f"Reachable pairs: {reachable_pairs}")
+    print(f"Unreachable pairs: {unreachable_pairs}")
+    print(f"Sparsity percentage: {sparsity_percentage:.2f}%")
+
+    # Create a binary matrix where 1 represents a reachable path and 0 represents an unreachable path
+    sparsity_matrix = np.where(df_shortest_path == -1, 0, 1)
+
+    plt.figure(figsize=(10, 8))
+    plt.imshow(sparsity_matrix, cmap='Greys', interpolation='nearest')
+    plt.title('Sparsity Pattern in Shortest Path Matrix')
+    plt.xlabel('Target Article')
+    plt.ylabel('Source Article')
+    plt.colorbar(label='Reachability (1=Reachable, 0=Unreachable)')
+    plt.show()
