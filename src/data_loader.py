@@ -4,13 +4,16 @@ from urllib.parse import unquote
 
 
 def get_bad_articles():
-    '''Returns the name and index of the articles in articles.tsv that are not wikipedia articles or that have missing propreties (e.g. missing categories) and should be removed.'''
+    '''
+    Returns the name and index of the articles in articles.tsv that are not wikipedia articles or 
+    that have missing propreties (e.g. missing categories, wrong shortest path) and should be removed.
+    '''
 
     filepath='./data/paths-and-graph/articles.tsv'
     articles = pd.read_csv(filepath, comment='#', names=["article"])
     articles = articles["article"].apply(unquote).replace('_', ' ', regex=True)
 
-    # The bad articles are not real wikipedia pages, cannot be parsed by the html parser and are do not appear in user paths
+    # The bad articles are not real wikipedia pages, cannot be parsed by the html parser or do not appear in user paths
     bad_articles = ['Directdebit', 'Donation', 'Friend Directdebit', 'Sponsorship Directdebit', 'Wowpurchase', 'Pikachu','Wikipedia Text of the GNU Free Documentation License']
     bad_articles_idx = articles[articles.isin(bad_articles)].index
 
@@ -19,7 +22,7 @@ def get_bad_articles():
 def read_articles():
     '''
     Return a Series with the article names, with '_' removed and the percent encoding unquoted.
-    Removes the articles in the list that are not wikipedia articles.
+    Removes the articles in the list that are not wikipedia articles (all articles in get_bad_articles).
     '''
 
     filepath='./data/paths-and-graph/articles.tsv'
@@ -33,6 +36,10 @@ def read_articles():
     return articles
 
 def read_categories():
+    '''
+    Loads the dataframe with the category information of articles. Removes all invalid articles.
+    Split categories into main and sub-categories into different columns
+    '''
 
     # Step 1: Load the data
     filepath='./data/paths-and-graph/categories.tsv'
@@ -78,7 +85,10 @@ def read_links():
     return links
 
 def read_shortest_path_matrix():
-    '''The rows are the source articles and the columns are the destination articles'''
+    '''
+    Read the shortest path lenght matrix (in the range 1-9, or -1 if there is no path)
+    The rows are the source articles and the columns are the destination articles
+    '''
     
     filepath='./data/paths-and-graph/shortest-path-distance-matrix.txt'
     with open(filepath, 'r') as file:
@@ -108,6 +118,10 @@ def read_shortest_path_matrix():
     return matrix
 
 def read_unfinished_paths():
+    '''
+    Load the dataset of unfinished game paths. Removes all paths with invalid articles in the path or as the target.
+    Removes 'Timeout' paths that are shorter than 30 minutes (as per Timeout definition)
+    '''
 
     filepath='./data/paths-and-graph/paths_unfinished.tsv'
     column_names = ['hashedIpAddress', 'timestamp', 'durationInSec', 'path', 'target', 'type']
@@ -117,13 +131,12 @@ def read_unfinished_paths():
     df['path'] = df['path'].apply(unquote).replace('_', ' ', regex=True)
     df['target'] = df['target'].apply(unquote).replace('_', ' ', regex=True)
 
-
     # Drop invalid articles
-    print("Unfinished Paths \nNumber of rows before filtering:", len(df))
+    print("Unfinished Paths\n---------------- \nNumber of rows before filtering:", len(df))
     valid_articles = set(read_articles())
     valid_articles.add("<")
 
-    ## Drop rows with invalid target articles
+    # Drop rows with invalid target articles
     invalid_target_articles = set()
     for target in df['target']:
         if target not in valid_articles:
@@ -131,7 +144,7 @@ def read_unfinished_paths():
     print("Invalid target articles found:", invalid_target_articles)
     df = df.loc[df['target'].isin(valid_articles)].reset_index(drop=True)
 
-    ## Drop invalid articles in the path
+    # Drop invalid articles in the path
     invalid_articles_set = set()
     def check_path(path):
         articles = path.split(';')
@@ -145,18 +158,21 @@ def read_unfinished_paths():
     print("Invalid articles found in path:", invalid_articles_set)
 
     len_df = len(df)
-    ## Drop rows where 'type' is 'timeout' and 'durationInSec' is less than 1800
+    # Drop rows where 'type' is 'timeout' and 'durationInSec' is less than 1800
     df = df[~((df['type'] == 'timeout') & (df['durationInSec'] < 1800))].reset_index(drop=True)
-    print("Number of rows dropped of type 'timeout' with a duration less than 30 minutes:", len_df - len(df), 
-          "Type 'timeout' occurs only after 30 minutes of inactivity, thus this path are technically impossible.")
+    print("Number of 'timeout' games with a duration of less than 30 minutes:", len_df - len(df))
 
     print("Number of rows after filtering:", len(df),"\n")
 
     return df
 
 def read_finished_paths():
+    '''
+    Load the dataset of finished game paths. Removes all paths with invalid articles in the path.
+    Removes paths with duration 0 (same start and target).
+    '''
 
-    filepath='./data/paths-and-graph/paths_finished.tsv'
+    filepath = './data/paths-and-graph/paths_finished.tsv'
     column_names = ['hashedIpAddress', 'timestamp', 'durationInSec', 'path', 'rating']
     df = pd.read_csv(filepath, sep='\t', comment='#', names=column_names)
 
@@ -164,7 +180,7 @@ def read_finished_paths():
     df['path'] = df['path'].apply(unquote).replace('_', ' ', regex=True)
 
     # Drop invalid articles
-    print("Finished Paths \nNumber of rows before filtering:", len(df))
+    print(f"Finished Paths\n-------------- \nNumber of rows before filtering: {len(df)}")
     valid_articles = set(read_articles())
     valid_articles.add("<")
 
@@ -182,12 +198,17 @@ def read_finished_paths():
     df = df[df["path"].apply(check_path)].reset_index(drop=True)
     df = df[~((df['durationInSec'] == 0) & (df['rating'].isnull()))]
     df.reset_index(drop=True, inplace=True)
-    print("Invalid articles found in path:", invalid_articles_set)
-    print("Number of rows after filtering:", len(df),"\n")
+    print(f"Invalid articles found in path: {invalid_articles_set}")
+    print(f"Number of rows after filtering: {len(df)}")
     
     return df
 
 def read_similartiy_matrix():
+    '''
+    Read the semantic similarity matrix, assuming it was computed only for valid articles.
+    Adds the article names as indices for the matrix
+    '''
+
     filepath='./data/paths-and-graph/similarity_matrix.npy'
     article_names = read_articles()
     sm = np.load(filepath)
@@ -198,6 +219,12 @@ def read_similartiy_matrix():
     return df_sm
 
 def read_categories_matrix():
+    '''
+    Read the semantic category similarity matrix (Jaccard similarity), assuming it was computed only for valid articles.
+    Adds the article names as indices for the matrix
+
+    '''
+
     filepath='./data/paths-and-graph/category_jaccard_similarity.npy'
     articles_names = read_articles()
     df_cm = pd.DataFrame(np.load(filepath, allow_pickle=True))
@@ -217,7 +244,9 @@ def find_shortest_distance(row, distance_matrix):
     return distance_matrix.loc[articles[0]][articles[-1]]
 
 def replace_back_clicks(path):
-    '''Replaces back clicks < with the article that was landed on'''
+    '''
+    Replaces back clicks < with the article that was landed on.
+    '''
     articles = path.split(';')
     resolved_path = []
     consecutive_backclicks = 0
