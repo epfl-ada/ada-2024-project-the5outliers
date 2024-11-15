@@ -181,7 +181,6 @@ def read_finished_paths():
     
     df = df[df["path"].apply(check_path)].reset_index(drop=True)
     df = df[~((df['durationInSec'] == 0) & (df['rating'].isnull()))]
-    df['rating'] = df['rating'].fillna('NaN')
     df.reset_index(drop=True, inplace=True)
     print("Invalid articles found in path:", invalid_articles_set)
     print("Number of rows after filtering:", len(df),"\n")
