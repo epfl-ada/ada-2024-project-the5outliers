@@ -31,9 +31,16 @@ $$J(A, B)=\frac{|A \cap B|}{|A \cup B|}$$
 <h3 style= "color: #c7c9cf"> HTML parsing </h3>
 Parsing allows to find interesting features of the wikipedia articles: the number of words and links, and hence the link density. It also gives structural information about the pages: categories, subcategories, the presence and nature of tables. For each of these structures, the number of words and the list of present links is reported. 
 
-<h3 style= "color: #c7c9cf"> Networks </h3>
+<h3 style= "color: #c7c9cf"> Networks and Graph </h3>
 
-Networks are particularly useful for representation of complex relations between for example categories or category transitions. Furthermore, they are used as clustering for the similarity measures: reordering of the articles based on similarity allows to find meaningful clusters of similar articles.
+Networks are particularly useful for representation of complex relations between for example categories or category transitions.
+
+- **Nodes:** Each node can represents a group of articles belonging to a specific category, with each article assigned to his main category. 
+- **Edges:** Each edge can represents a transition from one article category to another, indicating the flow of user activity.
+
+The node positions are determined using a **force-directed algorithm** where each *nodes* repel each other like charged particles (sometimes called an anti-gravity force) preventing overlaps and the *edges* act like springs, pulling connected nodes closer to reflect their relationships.
+
+Furthermore, they are used as clustering for the similarity measures: reordering of the articles based on similarity allows to find meaningful clusters of similar articles.
 
 <h3 style= "color: #c7c9cf"> Assignment of methods to research questions </h3>
 
