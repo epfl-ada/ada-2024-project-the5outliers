@@ -613,7 +613,7 @@ def plot_cooccurrence_cat_matrix(df_categories, abbreviations=None):
     plt.title("Co-occurrence of Level 1 Categories in Articles with Main Category Suggestion")
     plt.xlabel("Level 1 Category")
     plt.ylabel("Level 1 Category")
-    plt.xticks(rotation=0, ha="right", fontsize=10)
+    plt.xticks(rotation=0, fontsize=10)
     plt.yticks(fontsize=10, rotation=0)
 
     # Add an enhanced legend for abbreviations
