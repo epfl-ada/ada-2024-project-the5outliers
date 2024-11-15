@@ -31,7 +31,7 @@ $$J(A, B)=\frac{|A \cap B|}{|A \cup B|}$$
 <h3 style= "color: #c7c9cf"> HTML parsing </h3>
 Parsing allows to find interesting features of the wikipedia articles: the number of words and links, and hence the link density. It also gives structural information about the pages: categories, subcategories, the presence and nature of tables. For each of these structures, the number of words and the list of present links is reported. 
 
-<h3 style= "color: #c7c9cf"> Networks and Graph </h3>
+<h3 style= "color: #c7c9cf"> Networks and Graphs </h3>
 
 Networks are particularly useful for representation of complex relations between for example categories or category transitions.
 
