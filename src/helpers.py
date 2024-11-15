@@ -2,6 +2,10 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap, BoundaryNorm
+import numpy as np
+import seaborn as sn
 
 def create_treemap_data(df):
     """
@@ -411,3 +415,139 @@ def find_categories_start_end(paths, categories) :
     paths["end_category"] = paths["end"].apply(lambda x: categories[categories["article"] == x]["category"].values[0].split(".")[1] if x in categories["article"].values else None)
 
     return paths
+
+def plot_cooccurrence_cat_matrix(df_categories, abbreviations=None):
+    """
+    Plots a co-occurrence matrix using abbreviations for category labels in the heatmap.
+    
+    Parameters:
+    - df_categories (DataFrame): The DataFrame with 'article' and 'level_1' columns.
+    - abbreviations (dict, optional): A dictionary mapping full category names to abbreviations.
+    """
+    # Get the unique categories from the DataFrame
+    categories_full = df_categories['level_1'].unique()
+    
+    # If abbreviations are provided, map the full category names to abbreviations
+    if abbreviations:
+        categories_abbr = [abbreviations.get(cat, cat) for cat in categories_full]
+    else:
+        categories_abbr = categories_full
+
+    # Group by article and collect unique level_1 categories for each article
+    article_combinations = (
+        df_categories.groupby("article")["level_1"]
+        .apply(lambda x: tuple(sorted(x.unique())))  # Sort and get unique level_1 values as a tuple
+    )
+    combination_counts = article_combinations.value_counts()
+
+    # Create a co-occurrence matrix using abbreviations for the plot
+    matrix = pd.DataFrame(0, index=categories_abbr, columns=categories_abbr)
+
+    # Fill the matrix with co-occurrence counts
+    for comb, count in zip(combination_counts.index, combination_counts):
+        for i in comb:
+            for j in comb:
+                matrix.loc[abbreviations.get(i, i), abbreviations.get(j, j)] += count
+
+    # Calculate the total articles for each category using the diagonal
+    total_articles = pd.Series(np.diag(matrix), index=categories_abbr)
+
+    # Mask for the upper triangle excluding the diagonal
+    mask = np.triu(np.ones_like(matrix, dtype=bool), k=1) | (matrix == 0)
+
+    # Plot the co-occurrence matrix
+    plt.figure(figsize=(10, 8))
+    sn.heatmap(
+        matrix,
+        annot=True,
+        fmt="g",
+        cmap="YlGnBu",
+        cbar_kws={'label': 'Number of Co-occurrences'},
+        mask=mask,
+        linewidths=0.5
+    )
+
+    # Annotate each off-diagonal cell in the upper triangle to suggest a main category
+    for i, cat1 in enumerate(categories_abbr):
+        for j, cat2 in enumerate(categories_abbr):
+            if i < j and matrix.loc[cat1, cat2] > 0:  # Only upper triangle and non-zero cells
+                # Determine which category has fewer total articles
+                if total_articles[cat1] < total_articles[cat2]:
+                    main_category = cat1
+                else:
+                    main_category = cat2
+                
+                # Annotate the cell with the suggested main category
+                plt.text(
+                    j + 0.5, i + 0.5,
+                    f"{main_category}",
+                    ha='center', va='center', color="red", fontsize=8, fontweight='bold'
+                )
+
+    # Customize labels and layout
+    plt.title("Co-occurrence of Level 1 Categories in Articles with Main Category Suggestion")
+    plt.xlabel("Level 1 Category")
+    plt.ylabel("Level 1 Category")
+    plt.xticks(rotation=0, ha="right", fontsize=10)
+    plt.yticks(fontsize=10, rotation=0)
+
+    # Add an enhanced legend for abbreviations
+    if abbreviations:
+        legend_labels = [f"{abbr} = {name}" for name, abbr in abbreviations.items()]
+        plt.figtext(0.98, 0.5, "\n".join(legend_labels), ha="left", fontsize=10, bbox=dict(
+            facecolor="lightgrey", edgecolor="black", boxstyle="round,pad=0.5", linewidth=1))
+
+    plt.tight_layout()
+    plt.show()
+
+def matrix_common_paths(data):  
+    # Extract transitions and create transition counts
+    transitions = {}
+    for _, row in data.iterrows():
+        path = row['Category Path'].split(" -> ")
+        count = row['Count']
+        for i in range(len(path) - 1):
+            from_cat = path[i]
+            to_cat = path[i + 1]
+            if from_cat not in transitions:
+                transitions[from_cat] = {}
+            if to_cat not in transitions[from_cat]:
+                transitions[from_cat][to_cat] = 0
+            transitions[from_cat][to_cat] += count
+
+    # Create transition matrix DataFrame
+    categories = sorted(set([key for key in transitions] + [k for subdict in transitions.values() for k in subdict]))
+    transition_matrix = pd.DataFrame(0, index=categories, columns=categories)
+
+    # Populate the transition matrix with counts
+    for from_cat, to_cats in transitions.items():
+        for to_cat, count in to_cats.items():
+            transition_matrix.at[from_cat, to_cat] = count
+    
+    return transition_matrix
+
+def transition_cat_matrix(df):
+    # Get max value for setting the color scale
+    max_value = df.values.max()
+
+    # Define thresholds and corresponding colors
+    thresholds = [0, 100, 500, 1000, 5000, 10000, max_value]  # Adjust based on data range
+    colors = ["#f0f0f0", "#a6bddb", "#3690c0", "#034e7b", "#feb24c", "#f03b20"]
+    cmap = ListedColormap(colors)
+    norm = BoundaryNorm(thresholds, len(colors))
+
+
+    plt.figure(figsize=(9, 9))
+
+    # Mask zeros for better visibility in log scale
+    mask = df == 0
+    sn.heatmap(df, annot=True, annot_kws={"size": 9}, fmt="d", 
+                mask=mask, cmap=cmap, norm=norm, cbar_kws={'label': 'Count', 'shrink': 0.6} , square=True)
+    plt.title('Transition within categories')
+    plt.xlabel('To Category')
+    plt.ylabel('From Category')
+    plt.xticks(rotation=45, ha="right", fontsize=8)
+    plt.yticks(fontsize=8) 
+
+    plt.tight_layout()
+    plt.show()
