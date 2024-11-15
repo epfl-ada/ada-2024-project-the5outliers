@@ -149,3 +149,21 @@ def category_jaccard_similarity(categories, level_weights):
     )
 
     return similarity_weighted_jaccard_df  
+
+def compute_save_all():
+    '''Call this function from the base of the repo. Computes article embeddings and the two similarity matrices and saves them to data.'''
+    from src.data_loader import read_articles , read_categories
+
+    df_article_names = read_articles()
+
+    embeddings = BGEM3_embedding(df_article_names)
+    similarity_matrix = compute_embedding_similarity_matrix(embeddings)
+
+    df_categories = read_categories()
+    df_scat = category_jaccard_similarity(df_categories,{'level_1': 1, 'level_2': 2, 'level_3': 3}) 
+    df_scat = df_scat.loc[df_article_names, df_article_names]
+    df_scat = df_scat.astype(np.float32)
+
+    np.save('./data/embedded_articles.npy', embeddings)
+    np.save('./data/similarity_matrix.npy', similarity_matrix)
+    np.save('./data/category_jaccard_similarity.npy', df_scat)
