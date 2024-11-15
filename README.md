@@ -38,10 +38,15 @@ Networks are particularly useful for representation of complex relations between
 <h3 style= "color: #c7c9cf"> Assignment of methods to research questions </h3>
 
 1. Statistical analysis of article features. 
+
 2. Networks: centrality based on the connections between articles in certain categories and centrality based on the flow between categories from user paths.
+
 3. Compare key factors for the voyage and non-voyage paths: for subsets of similar paths (e.g. same start and end category), compare the difficulty experiences by the player, the duration and length of the game and the ideal path. 
+
 4. Includes similarity analysis on paths (eventually with interpolation to compare paths of different lengths), showing whether users zoom out more from a semantic cluser in voyages.
+
 5. Explore different possible confounfing factors between human *navigation* and human *reasoning*, evaluate 
+
 6. aggregate categories and check if they pass through geo or country
 
 
@@ -68,10 +73,10 @@ Week 5:
 <h3 style= "color: #c7c9cf"> Quickstart </h3> 
 
 ```bash
-# clone project
+# Clone project
 git clone https://github.com/epfl-ada/ada-2024-project-the5outliers.git
 
-# create conda called 'ada_project' with all required packages
+# Create a conda environement called 'ada_project' with all the required packages
 conda env create -f requirements.yml
 ```
 
