@@ -485,7 +485,8 @@ def check_voyage_status(paths, finished, n):
     path_len = len(categories)
     
     # Exclude paths that start with "Countries" or "Geography"
-    if categories[0] in ['Geography', 'Countries']:
+    voyage_categories = ['Geography', 'Countries']
+    if categories[0] in voyage_categories or categories[-1] in voyage_categories:
         return False
     
     if finished: 
@@ -494,10 +495,10 @@ def check_voyage_status(paths, finished, n):
             return False
         # Case 2: Path length between 3 and n+2 -> check middle categories
         elif 2 < path_len <= n + 2:
-            return any(category in categories[1:-1] for category in ['Geography', 'Countries'])
+            return any(category in categories[1:-1] for category in voyage_categories)
         # Case 3: Path longer than n+2 -> check the first n categories after the first
         else:
-            return any(category in categories[1:n+1] for category in ['Geography', 'Countries'])
+            return any(category in categories[1:n+1] for category in voyage_categories)
         
     else: 
         # Case 1: Path with 1 or 2 categories -> always False
@@ -505,10 +506,10 @@ def check_voyage_status(paths, finished, n):
             return False
         # Case 2: Path length between 3 and n+2 -> check middle categories
         elif 1 < path_len <= n + 1:
-            return any(category in categories[1:] for category in ['Geography', 'Countries'])
+            return any(category in categories[1:] for category in voyage_categories)
         # Case 3: Path longer than n+2 -> check the first n categories after the first
         else:
-            return any(category in categories[1:n+1] for category in ['Geography', 'Countries'])
+            return any(category in categories[1:n+1] for category in voyage_categories)
 
 def category_voyage_sorting(category_paths, finished, n=3):
     """
@@ -540,8 +541,6 @@ def game_voyage_sorting(df_article_paths, df_categories, finished, n=3):
         DataFrame: Original DataFrame with an additional 'voyage' column (True/False).
     """
     # Map articles to their main categories
-    article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
-    
     category_path_df = get_main_categories_paths(df_article_paths, df_categories, omit_loops=True)
     
     # Apply the transformation and check voyage status
@@ -562,10 +561,12 @@ def plot_sankey_voyage(paths):
     Returns:
         None: it displays the Sankey diagram 
     """
+
+    voyage_categories = ['Geography', 'Countries']
     
     # Mapping for start, voyage, and end nodes
-    paths['start_category_label'] = paths['start_maincategory'].apply(lambda x: 'First in Countries/Geography' if x in ['Countries', 'Geography'] else 'First not in Countries/Geography')#####pro
-    paths['end_category_label'] = paths['end_maincategory'].apply(lambda x: 'Target in Countries/Geography' if x in ['Countries', 'Geography'] else 'Target not in Countries/Geography')
+    paths['start_category_label'] = paths['start_maincategory'].apply(lambda x: 'First in Countries/Geography' if x in voyage_categories else 'First not in Countries/Geography')
+    paths['end_category_label'] = paths['end_maincategory'].apply(lambda x: 'Target in Countries/Geography' if x in voyage_categories else 'Target not in Countries/Geography')
     paths['voyage_label'] = paths['voyage'].apply(lambda x: 'Voyage' if x else 'Non-Voyage')
 
     # Start→Voyage flows
