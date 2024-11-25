@@ -3,6 +3,61 @@ import numpy as np
 from urllib.parse import unquote
 
 
+def read_all():
+    '''The function that reads all the data and adds interesting features.'''
+    
+    from src.utils.HTMLParser import HTMLParser
+
+    parser = HTMLParser()
+    parser.load_pickle()
+    df_article_names = read_articles() 
+    df_html_stats = parser.get_df_html_stats()
+    df_categories = read_categories()
+    df_links = read_links()
+    df_shortest_path = read_shortest_path_matrix()
+    df_unfinished = read_unfinished_paths()
+    df_finished = read_finished_paths() 
+    df_sm = read_similartiy_matrix() 
+    df_scat = read_categories_matrix()
+
+    df_article = pd.DataFrame(df_article_names).copy()
+
+    # Compute in-degree (number of times each article is a target link)
+    in_degree = df_links.groupby('linkTarget').size().reset_index(name="in_degree")
+    # Compute out-degree (link density: number of times each article is a source link)
+    out_degree = df_links.groupby('linkSource').size().reset_index(name="out_degree")
+
+    # Merge in-degree and out-degree with df_article_names
+    df_article = df_article.merge(in_degree, left_on='article', right_on='linkTarget', how='left')
+    df_article = df_article.merge(out_degree, left_on='article', right_on='linkSource', how='left')
+    df_article = df_article.drop(columns=['linkTarget', 'linkSource'])
+
+    # Fill NaN values with 0, assuming no links imply zero counts for those articles
+    df_article = df_article.fillna(0).astype({'in_degree': 'int', 'out_degree': 'int'})
+
+    # add the html stats to the articles
+    df_html_stats = df_html_stats.rename(columns={'article_name': 'article'})
+    df_article = pd.merge(df_article, df_html_stats, how='inner')
+
+    # add the category (level_1) to each articles
+    category_map = dict(zip(df_categories["article"], df_categories["level_1"]))
+    df_article["category"] = df_article["article"].map(category_map)
+
+    # let's add some useful metrics to each paths dataframe: shortest path, semantic similarity
+    df_unfinished['cosine_similarity'] = df_unfinished.apply(lambda x: find_shortest_distance(x, df_sm), axis=1)
+    df_unfinished['shortest_path'] = df_unfinished.apply(lambda x: find_shortest_distance(x, df_shortest_path), axis=1)
+    df_unfinished['path_length'] = df_unfinished['path'].apply(lambda x: x.count(';') + 1)
+    df_unfinished['back_clicks'] = df_unfinished['path'].apply(lambda x: x.count('<'))
+    df_unfinished['categories_similarity'] = df_unfinished.apply(lambda x: find_shortest_distance(x, df_scat), axis=1)
+
+    df_finished['cosine_similarity'] = df_finished.apply(lambda x: find_shortest_distance(x, df_sm), axis=1)
+    df_finished['shortest_path'] = df_finished.apply(lambda x: find_shortest_distance(x, df_shortest_path), axis=1)
+    df_finished['path_length'] = df_finished['path'].apply(lambda x: x.count(';') + 1)
+    df_finished['back_clicks'] = df_finished['path'].apply(lambda x: x.count('<'))
+    df_finished['categories_similarity'] = df_finished.apply(lambda x: find_shortest_distance(x, df_scat), axis=1)
+
+    return df_article_names, df_html_stats, df_categories, df_links, df_shortest_path, df_unfinished, df_finished, df_sm, df_scat
+
 def get_bad_articles():
     '''
     Returns the name and index of the articles in articles.tsv that are not wikipedia articles or 
