@@ -462,7 +462,7 @@ def plot_normalized_position_bar(df_position, title="Normalized Category Frequen
     # Show the interactive plot
     fig.show()
     
-def check_voyage_status(paths, finished, n):
+def check_voyage_status(paths, finished, n, voyage_categories = ['Geography', 'Countries']):
     """
     Check if the category path is voyage or not voyage, that is whether the first n categories after the first are 'Geography' or 'Countries'. 
 
@@ -482,8 +482,7 @@ def check_voyage_status(paths, finished, n):
     categories = paths.split(' -> ')
     path_len = len(categories)
     
-    # Exclude paths that start with "Countries" or "Geography"
-    voyage_categories = ['Geography', 'Countries']
+    # Exclude paths that start with categories on voyage_categories
     if categories[0] in voyage_categories or categories[-1] in voyage_categories:
         return False
     
@@ -524,7 +523,7 @@ def category_voyage_sorting(category_paths, finished, n=3):
     category_paths['voyage'] = category_paths['Category Path'].apply(lambda p: check_voyage_status(p, finished, n)) 
     return category_paths 
 
-def game_voyage_sorting(df_article_paths, df_categories, finished, n=3):
+def game_voyage_sorting(df_article_paths, df_categories, finished, n=3, voyage_categories = ['Geography', 'Countries']):
     """
     Adds a boolean 'voyage' column to each game.
     First maps articles to categories (requirement for using check_voyage_status()), then checks if the category path qualifies as a 'voyage'.
@@ -545,7 +544,7 @@ def game_voyage_sorting(df_article_paths, df_categories, finished, n=3):
     df_article_paths['Category Path'] = category_path_df['Category Path']
     df_article_paths['start_maincategory'] = category_path_df['start_maincategory']
     df_article_paths['end_maincategory'] = category_path_df['end_maincategory']
-    df_article_paths['voyage'] = df_article_paths['Category Path'].apply(lambda p: check_voyage_status(p, finished, n))
+    df_article_paths['voyage'] = df_article_paths['Category Path'].apply(lambda p: check_voyage_status(p, finished, n, voyage_categories=voyage_categories))
     
     return df_article_paths
 
