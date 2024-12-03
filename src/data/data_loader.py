@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from urllib.parse import unquote
 
+from src.utils.helpers import filter_most_specific_category
+
 
 def read_all():
     '''The function that reads all the data and adds interesting features.'''
@@ -39,6 +41,8 @@ def read_all():
     df_html_stats = df_html_stats.rename(columns={'article_name': 'article'})
     df_article = pd.merge(df_article, df_html_stats, how='inner')
 
+    # Attributing the main category to articles with multiple categories based on the category with fewer total articles
+    df_categories = filter_most_specific_category(df_categories)
     # add the category (level_1) to each articles
     category_map = dict(zip(df_categories["article"], df_categories["level_1"]))
     df_article["category"] = df_article["article"].map(category_map)
