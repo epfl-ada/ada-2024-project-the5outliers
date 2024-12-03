@@ -1,4 +1,5 @@
 import pandas as pd
+import plotly
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
@@ -204,7 +205,6 @@ def find_all_source_target_pairs(df_finished, df_unfinished, df_links):
     
     return optimal_paths
 
-
 def find_shortest_path(row, G):
     """
     Finds the shortest path between the source and target nodes in a graph.
@@ -222,7 +222,6 @@ def find_shortest_path(row, G):
     except nx.NetworkXNoPath:
         path = None  # If no path exists
     return path
-
 
 def compare_with_matrix(row, df_shortest_path):
     """
@@ -245,7 +244,6 @@ def compare_with_matrix(row, df_shortest_path):
     matches_matrix = computed_length == matrix_length
 
     return computed_length, matrix_length, matches_matrix
-
 
 def calculate_optimal_path(df_links, optimal_paths, df_shortest_path):
     """
@@ -625,6 +623,7 @@ def plot_sankey_voyage(paths):
     )
     
     fig.show()
+    return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
 
 def backtrack(paths) :
     """
