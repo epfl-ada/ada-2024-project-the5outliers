@@ -873,6 +873,76 @@ def plot_articles_pie_chart(df, abbreviations=None):
     plt.tight_layout()  # Adjust layout to ensure everything fits
     plt.show()
     
+def plot_links_in_else_out_articles_pie_chart(df, in_or_out , palette, abbreviations=None):
+    """
+    Plots pie chart of mean in or out degree of categories
+    Parameters:
+    - df (DataFrame): The DataFrame containing 'article' and 'category', 'in_degree', and 'out_degree' columns.
+    - in_else_out : in degree if true, out degree if false
+    - pallette (dict): palette to use for categories containing others country and geo
+    - abbreviations (dict, optional): A dictionary mapping full category names to abbreviations.
+
+    """
+    if in_or_out:
+        in_degree_tot = df.groupby('category')['in_degree'].mean().sort_values(ascending=False)
+    else :
+        in_degree_tot = df.groupby('category')['out_degree'].mean().sort_values(ascending=False)
+    
+    labels_cat = in_degree_tot.keys()
+
+    # Handle small categories (less than 3%) by grouping them as 'Others'
+    threshold = 3  # percentage threshold
+    small_categories = in_degree_tot[in_degree_tot / in_degree_tot.sum() * 100 < threshold]
+    small_categories_total = small_categories.sum()
+    large_categories = in_degree_tot[in_degree_tot / in_degree_tot.sum() * 100 >= threshold]
+
+    # Add "Others" for small categories
+    if not small_categories.empty:
+        others = pd.Series({f'Others': small_categories_total})
+        large_categories = pd.concat([large_categories, others])
+
+    # Prepare the labels: Use abbreviations if provided
+    if abbreviations:
+        labels = [abbreviations.get(cat, cat) for cat in large_categories.index]
+        legend_labels = [f"{cat} ({abbreviations.get(cat, 'N/A')})" for cat in large_categories.index]
+    else:
+        labels = large_categories.index
+        legend_labels = labels 
+
+    # Plot the pie chart
+    fig, ax = plt.subplots(figsize=(7, 7))
+    wedges, texts, autotexts = ax.pie(
+        large_categories, 
+        labels=labels, 
+        autopct='%1.1f%%', 
+        startangle=90,
+        pctdistance=0.8,
+        colors=[palette[label] for label in labels_cat]
+    )
+
+    # Customize the font and color of the numbers
+    for autotext in autotexts:
+        autotext.set_fontsize(9)  # Change font size
+
+    # Set the title of the plot
+    if in_or_out:
+        ax.set_title('mean number of links in an article of a category')
+    else :
+        ax.set_title('mean number of links pointing to an article of a category')
+        
+    # Place the legend outside the pie chart to avoid overlap
+    ax.legend(
+        legend_labels, 
+        title="Categories", 
+        loc='center left', 
+        bbox_to_anchor=(1, 0.5), 
+        fontsize=10
+    )
+
+    # Display the pie chart
+    plt.tight_layout()  # Adjust layout to ensure everything fits
+    plt.show()
+    
 def plot_shortest_paths_matrix(df_shortest_path):
 
     # Total number of article pairs
