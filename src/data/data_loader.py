@@ -74,6 +74,23 @@ def get_bad_articles():
 
     # The bad articles are not real wikipedia pages, cannot be parsed by the html parser or do not appear in user paths
     bad_articles = ['Directdebit', 'Donation', 'Friend Directdebit', 'Sponsorship Directdebit', 'Wowpurchase', 'Pikachu','Wikipedia Text of the GNU Free Documentation License']
+
+    # Articles with no links (dead game)
+    no_links = ['Badugi',
+        'Color Graphics Adapter',
+        'Douglas DC-4',
+        'Duchenne muscular dystrophy',
+        "Klinefelter's syndrome",
+        'Local community',
+        'Lone Wolf (gamebooks)',
+        'Osteomalacia',
+        'Private Peaceful',
+        'Schatzki ring',
+        'Suikinkutsu',
+        'Underground (stories)',
+        'Vacutainer']
+    bad_articles += no_links
+
     bad_articles_idx = articles[articles.isin(bad_articles)].index
 
     return bad_articles, bad_articles_idx.to_list()
