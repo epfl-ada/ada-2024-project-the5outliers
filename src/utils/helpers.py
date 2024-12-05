@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
+from collections import Counter
 from matplotlib.colors import ListedColormap, BoundaryNorm
 import numpy as np
 import seaborn as sn
@@ -204,6 +205,28 @@ def find_all_source_target_pairs(df_finished, df_unfinished, df_links):
     optimal_paths = optimal_paths[optimal_paths['source'].isin(unique_nodes) & optimal_paths['target'].isin(unique_nodes)]
     
     return optimal_paths
+
+def count_start_and_target_per_articles(df_finished, df_unfinished, df_article):
+    '''
+    adds 2 columns to the df_articles df :
+        - start_count : number of time this article was assigned as start 
+        - target_count : number of time this article was assigned as target 
+    '''
+    #extrtct start and target of finished and unfinished paths 
+    start_finished = df_finished['path'].str.split(';').str[0]
+    target_finished = df_finished['path'].str.split(';').str[-1]
+    start_unfinished = df_unfinished['path'].str.split(',').str[0]
+    target_unfinished = df_unfinished['target']
+
+    #count start and targets
+    start_count = Counter(start_finished)+Counter(start_unfinished)
+    target_count = Counter(target_finished)+Counter(target_unfinished)
+
+    df_article['start_count'] = df_article['article'].map(start_count)
+    df_article['target_count'] = df_article['article'].map(target_count)
+    
+    return None
+
 
 def find_shortest_path(row, G):
     """
@@ -810,7 +833,7 @@ def transition_cat_matrix(df):
     plt.tight_layout()
     plt.show()
 
-def plot_articles_pie_chart(df, abbreviations=None):
+def plot_articles_pie_chart(df, palette, abbreviations=None):
     """
     Plots a simplified pie chart of the total number of articles per Level 1 category.
 
@@ -851,6 +874,7 @@ def plot_articles_pie_chart(df, abbreviations=None):
         autopct='%1.1f%%', 
         startangle=90,
         pctdistance=0.8,
+        colors=[palette[label] for label in large_categories.index],
     )
 
     # Customize the font and color of the numbers
@@ -872,6 +896,252 @@ def plot_articles_pie_chart(df, abbreviations=None):
     # Display the pie chart
     plt.tight_layout()  # Adjust layout to ensure everything fits
     plt.show()
+    
+def plot_proportion_links_in_cat_pie_chart(df, in_or_out , palette, abbreviations=None):
+    """
+    use plot_proportions_of_in_and_out_degree_in_categories() for both on same plot 
+    Plots pie chart of the total number (sum) of all links for category.
+    ex for out degree: 25% of all links are in country articles 
+    ex for in degree: 25% of all links target country articles 
+    Parameters:
+    - df (DataFrame): The DataFrame containing 'article' and 'category', 'in_degree', and 'out_degree' columns.
+    - in_else_out : in degree if true, out degree if false
+    - pallette (dict): palette to use for categories containing others country and geo
+    - abbreviations (dict, optional): A dictionary mapping full category names to abbreviations.
+
+    """
+    if in_or_out:
+        in_degree_tot = df.groupby('category')['in_degree'].sum().sort_values(ascending=False)
+    else :
+        in_degree_tot = df.groupby('category')['out_degree'].sum().sort_values(ascending=False)
+    
+    labels_cat = in_degree_tot.keys()
+
+    # Handle small categories (less than 3%) by grouping them as 'Others'
+    threshold = 3  # percentage threshold
+    small_categories = in_degree_tot[in_degree_tot / in_degree_tot.sum() * 100 < threshold]
+    small_categories_total = small_categories.sum()
+    large_categories = in_degree_tot[in_degree_tot / in_degree_tot.sum() * 100 >= threshold]
+
+    # Add "Others" for small categories
+    if not small_categories.empty:
+        others = pd.Series({f'Others': small_categories_total})
+        large_categories = pd.concat([large_categories, others])
+
+    # Prepare the labels: Use abbreviations if provided
+    if abbreviations:
+        labels = [abbreviations.get(cat, cat) for cat in large_categories.index]
+        legend_labels = [f"{cat} ({abbreviations.get(cat, 'N/A')})" for cat in large_categories.index]
+    else:
+        labels = large_categories.index
+        legend_labels = labels 
+
+    # Plot the pie chart
+    fig, ax = plt.subplots(figsize=(7, 7))
+    wedges, texts, autotexts = ax.pie(
+        large_categories, 
+        labels=labels, 
+        autopct='%1.1f%%', 
+        startangle=90,
+        pctdistance=0.8,
+        colors=[palette[label] for label in labels_cat]
+    )
+
+    # Customize the font and color of the numbers
+    for autotext in autotexts:
+        autotext.set_fontsize(9)  # Change font size
+
+    # Set the title of the plot
+    if in_or_out:
+        ax.set_title('Category-wise share of all out-degree links')
+    else :
+        ax.set_title('Proportions of links targetting each categories')
+        
+    # Place the legend outside the pie chart to avoid overlap
+    ax.legend(
+        legend_labels, 
+        title="Categories", 
+        loc='center left', 
+        bbox_to_anchor=(1, 0.5), 
+        fontsize=10
+    )
+
+    # Display the pie chart
+    plt.tight_layout()  # Adjust layout to ensure everything fits
+    plt.show()
+    
+def plot_proportions_of_in_and_out_degree_in_categories(df, palette, abbreviations=None, threshold=3):
+    """
+    Plots pie charts for proportions of in-degree and out-degree links across categories.
+
+    Parameters:
+    - df (DataFrame): The DataFrame containing 'category', 'in_degree', and 'out_degree' columns.
+    - palette (dict): Palette to use for categories, including 'Others'.
+    - abbreviations (dict, optional): A dictionary mapping full category names to abbreviations.
+    - threshold (int, optional): Minimum percentage to display a category individually; others are grouped under 'Others'.
+    """
+    # Sum in-degree and out-degree by category
+    in_degree_tot = df.groupby('category')['in_degree'].sum()
+    out_degree_tot = df.groupby('category')['out_degree'].sum()
+
+    # Handle small categories by grouping them as "Others"
+    def handle_small_categories(category_dict):
+        small_categories = category_dict[category_dict / category_dict.sum() * 100 < threshold]
+        small_categories_total = small_categories.sum()
+        large_categories = category_dict[category_dict / category_dict.sum() * 100 >= threshold]
+        if not small_categories.empty:
+            others = pd.Series({'Others': small_categories_total})
+            large_categories = pd.concat([large_categories, others])
+        return large_categories
+
+    in_degree_tot = handle_small_categories(in_degree_tot)
+    out_degree_tot = handle_small_categories(out_degree_tot)
+
+    # Prepare labels
+    def prepare_labels(category_dict):
+        if abbreviations:
+            labels = [abbreviations.get(cat, cat) for cat in category_dict.index]
+        else:
+            labels = category_dict.index
+        return labels
+
+    in_labels = prepare_labels(in_degree_tot)
+    out_labels = prepare_labels(out_degree_tot)
+
+    # Create subplots
+    fig, ax = plt.subplots(1, 2, figsize=(15, 7))
+
+    # Plot in-degree pie chart
+    ax[0].pie(
+        in_degree_tot.values,
+        labels=in_labels,
+        autopct='%1.1f%%',
+        startangle=90,
+        pctdistance=0.8,
+        colors=[palette.get(cat, "#cccccc") for cat in in_degree_tot.index],
+    )
+    ax[0].set_title("Proportion of Links Targeting Each Category", fontsize=14)
+
+    # Plot out-degree pie chart
+    ax[1].pie(
+        out_degree_tot.values,
+        labels=out_labels,
+        autopct='%1.1f%%',
+        startangle=90,
+        pctdistance=0.8,
+        colors=[palette.get(cat, "#cccccc") for cat in out_degree_tot.index],
+    )
+    ax[1].set_title("Proportion of Links Leaving Each Category", fontsize=14)
+
+    # Add a single legend
+    add_legend_category(
+        fig=fig,
+        palette_category=palette,
+        categories=palette.keys(),
+        bbox_to_anchor=(1, 0.75)
+    )
+
+    # Adjust layout
+    plt.suptitle("Proportions of in and out degree links by Category", fontsize=16, y=1.05)
+    plt.tight_layout(rect=[0, 0, 0.85, 1])  # Adjust for the legend
+    plt.show()
+
+
+  
+    
+def add_legend_category(fig, palette_category, categories, bbox_to_anchor=(1.15, 0.85)):
+
+    handles = [
+        plt.Line2D([0], [0], marker='o', color=color, linestyle='', markersize=10) 
+        for color in palette_category.values()  # Use values from the dictionary
+    ]
+    labels = list(palette_category.keys())
+    fig.legend(
+        handles, 
+        labels, 
+        bbox_to_anchor=bbox_to_anchor, 
+        title="Categories", 
+    )
+    
+def plot_proportion_category_start_stop_pies(df_article, palette, abbreviations=None, threshold=2.3):
+    """
+    Makes pie charts showing the proportion of categories in start/target articles.
+    
+    Parameters:
+    - df_article (DataFrame): DataFrame containing 'start_count' and 'target_count'
+    - palette (dict): Color palette for the categories
+    - abbreviations (dict, optional): Dictionary mapping full category names to abbreviations 
+    - threshold (int, optional): Minimum percentage to display a category individually: Others are grouped under 'Others'
+    """
+    # count number of articles given as start and target for each category
+    start_dict = df_article.groupby('category')['start_count'].sum()
+    target_dict = df_article.groupby('category')['target_count'].sum()
+
+    # Handle small categories by grouping them as "Others"
+    def handle_small_categories(category_dict):
+        small_categories = category_dict[category_dict / category_dict.sum() * 100 < threshold]
+        small_categories_total = small_categories.sum()
+        large_categories = category_dict[category_dict / category_dict.sum() * 100 >= threshold]
+        if not small_categories.empty:
+            others = pd.Series({'Others': small_categories_total})
+            large_categories = pd.concat([large_categories, others])
+        return large_categories
+
+    start_dict = handle_small_categories(start_dict)
+    target_dict = handle_small_categories(target_dict)
+
+    # Use abbreviations if provided
+    def prepare_labels(category_dict):
+        if abbreviations:
+            labels = [abbreviations.get(cat, cat) for cat in category_dict.index]
+            legend_labels = [f"{cat} ({abbreviations.get(cat, 'N/A')})" for cat in category_dict.index]
+        else:
+            labels = category_dict.index
+            legend_labels = labels
+        return labels, legend_labels
+
+    start_labels, start_legend_labels = prepare_labels(start_dict)
+    target_labels, target_legend_labels = prepare_labels(target_dict)
+
+
+    # subplots
+    fig, ax = plt.subplots(1, 2, figsize=(15, 7))
+
+    # Plot start atricles pie in 0 slot
+    ax[0].pie(
+        start_dict.values,
+        labels=start_labels,
+        colors=[palette.get(cat, "#cccccc") for cat in start_dict.index],
+        autopct='%1.1f%%',
+        startangle=90,
+        pctdistance=0.8
+    )
+    ax[0].set_title("Proportion of categories in start articles", fontsize=14)
+
+    # Plot target articles pie in 1 slot
+    ax[1].pie(
+        target_dict.values,
+        labels=target_labels,
+        colors=[palette.get(cat, "#cccccc") for cat in target_dict.index],
+        autopct='%1.1f%%',
+        startangle=90,
+        pctdistance=0.8
+    )
+    ax[1].set_title("Proportion of categories in target articles", fontsize=14)
+
+    add_legend_category(
+        fig=fig,
+        palette_category=palette,
+        categories=palette.keys(),
+        bbox_to_anchor=(1.15, 0.85)
+    )
+    plt.suptitle("Proportions of Categories in Start and Target Articles", fontsize=16, y=1.05)
+    plt.tight_layout()
+
+    plt.show()
+
+
+
     
 def plot_shortest_paths_matrix(df_shortest_path):
 
