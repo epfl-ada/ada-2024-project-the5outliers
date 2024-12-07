@@ -60,7 +60,7 @@ def read_all():
     df_finished['back_clicks'] = df_finished['path'].apply(lambda x: x.count('<'))
     df_finished['categories_similarity'] = df_finished.apply(lambda x: find_shortest_distance(x, df_scat), axis=1)
 
-    return df_article_names, df_html_stats, df_categories, df_links, df_shortest_path, df_unfinished, df_finished, df_sm, df_scat
+    return df_article_names, df_html_stats, df_categories, df_links, df_shortest_path, df_unfinished, df_finished, df_sm, df_scat, df_article
 
 def get_bad_articles():
     '''
