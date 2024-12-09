@@ -1180,3 +1180,74 @@ def plot_shortest_paths_matrix(df_shortest_path):
     plt.ylabel('Source Article')
     plt.colorbar(label='Reachability (1=Reachable, 0=Unreachable)')
     plt.show()
+
+   
+def generate_random_path(start, articles_links, nb_articles=30):
+    
+    if start not in articles_links or len(articles_links[start]) == 0:
+        return start
+    
+    random_path = [start]
+    
+    while len(random_path) < nb_articles:
+        # print(random_path)
+        if random_path[-1] == "<":
+            valid_art = [random_path[i] for i in range(len(random_path)) if (i == 0 or random_path[i-1] != '<') and (i == len(random_path)-1 or random_path[i+1] != '<') and random_path[i] != '<']
+            next_article = np.random.choice(articles_links[valid_art[-1] if len(valid_art)>0 else valid_art])
+            
+        elif random_path[-1] not in articles_links :
+            # print(random_path)
+            random_path.pop(-1) 
+            continue
+        
+        elif len(articles_links[random_path[-1]]) == 0:
+            next_article = "<"
+            
+        else :
+            next_article = np.random.choice(articles_links[random_path[-1]]) 
+        
+        if next_article in articles_links or next_article == "<":
+            random_path.append(next_article)  
+                     
+    return ";".join(random_path)
+
+def compute_mean_of_lists(df):
+    for column in df.columns:
+        # Apply mean to each list in the column and replace the list with its mean
+        df[column] = df[column].apply(lambda x: sum(x) / len(x) if isinstance(x, list) else x)
+    return df
+
+def compute_proba_links(df_categories, parser) : 
+    article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
+    articles_links = {article: data["total_links"] for article, data in parser.parsed_articles.items()}
+    articles_categories_list = {}
+    articles_categories_proba = {}
+    cat_to_cat_proba = {}
+    for article in articles_links :
+        articles_categories_list[article] = []
+        for link in articles_links[article] :
+            articles_categories_list[article].append(article_to_category.get(link, "None"))
+        articles_categories_proba[article] = {category: articles_categories_list[article].count(category) / len(articles_categories_list[article]) for category in set(articles_categories_list[article])}
+        
+        if article_to_category.get(article, "None") not in cat_to_cat_proba.keys() :
+            cat_to_cat_proba[article_to_category.get(article, "None")] = {}
+            
+        for category in set(articles_categories_list[article]) :
+            if category not in cat_to_cat_proba[article_to_category.get(article, "None")].keys() :
+                cat_to_cat_proba[article_to_category.get(article, "None")][category] = [articles_categories_proba[article][category]]
+            else :  
+                cat_to_cat_proba[article_to_category.get(article, "None")][category].append(articles_categories_proba[article][category])
+                
+    df = pd.DataFrame.from_dict(cat_to_cat_proba)
+    df = compute_mean_of_lists(df)
+    df["<"] = 1
+    df.loc["<"] = 1
+    df
+    return df, articles_categories_proba, articles_categories_list
+
+def compute_proba_path(path, cat_to_cat_proba_df):
+    path = path.split(" -> ")
+    proba_path = 1
+    for i in range(min(len(path)-1, 1)):
+        proba_path *= cat_to_cat_proba_df[path[i]][path[i+1]]
+    return proba_path #** (1 / (len(path)))
