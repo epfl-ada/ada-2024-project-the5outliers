@@ -151,8 +151,9 @@ def category_jaccard_similarity(categories, level_weights):
     return similarity_weighted_jaccard_df  
 
 def compute_save_all():
-    '''Call this function from the base of the repo. Computes article embeddings and the two similarity matrices and saves them to data.'''
-    from data.data_loader import read_articles , read_categories
+    '''Call this function from the base of the repo. Computes article embeddings and the two similarity matrices and saves them to data.
+    This saves the similarity matrix in data for safety, but needs to be moved in paths and graphs to be used'''
+    from src.data.data_loader import read_articles , read_categories
 
     df_article_names = read_articles()
 
