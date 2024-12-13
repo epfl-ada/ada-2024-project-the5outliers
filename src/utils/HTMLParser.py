@@ -28,7 +28,7 @@ class HTMLParser:
         '''
         Parse a selection of valid articles (those with the indices of self.article_names passed)
         For instance, to get all the same articles as in paths-and-graph:
-        indices = [i for i in df_html_articles.index if df_html_articles[i] in df_article_names.values]
+        indices = [i for i in parser.article_names.index if parser.article_names[i] in df_article_names.values]
         '''
 
         for i in tqdm(indices):
