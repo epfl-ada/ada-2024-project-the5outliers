@@ -68,7 +68,7 @@ def create_treemap_data(df):
 
     return labels, parents, values, ids
 
-def get_main_categories_paths(df_paths, df_categories, users=True, omit_loops=False):
+def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_level=True, finished=True):
     """
     Give common category paths from article paths and start-end categories.
 
@@ -76,6 +76,8 @@ def get_main_categories_paths(df_paths, df_categories, users=True, omit_loops=Fa
         df_paths (pd.DataFrame): DataFrame containing article paths with a 'path' column. 
         df_categories (pd.DataFrame): DataFrame mapping articles to main categories, with 'article' and 'level_1' columns. 
         omit_loops (bool): Optional; if True, removes consecutive repetitions of the same category within a path. 
+        one_level (bool): True when want only the first level of categories.
+        finished (bool): True if working on a finished path.
 
     Returns:
         pd.DataFrame: A DataFrame of the most common category paths, with columns:
@@ -89,17 +91,16 @@ def get_main_categories_paths(df_paths, df_categories, users=True, omit_loops=Fa
         - Each path is represented as a string with categories separated by ' -> '.
     """
     # Map articles to main categories
-    article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
+    if one_level:
+        article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
+    else: article_to_category = dict(zip(df_categories['article'], df_categories['category']))
     
     category_paths = []
     start_categories = []
     end_categories = []
     
-    for path in df_paths['path']:
-        if users:
-            articles = path.split(';')
-        else:
-            articles = path
+    for index, path in df_paths['path'].items():
+        articles = path.split(';')
         categories = [article_to_category.get(article, article) for article in articles]
 
         # Remove consecutive duplicate categories if omit_loops is True
@@ -107,13 +108,15 @@ def get_main_categories_paths(df_paths, df_categories, users=True, omit_loops=Fa
             categories = [category for i, category in enumerate(categories) 
                           if i == 0 or category != categories[i - 1]]
 
-        # Create a string representation of the category path
-        category_path = ' -> '.join(categories)
-        category_paths.append(category_path)
+        category_paths.append(categories)
         
         # Extract start and end categories
         start_categories.append(categories[0] if categories else None)
-        end_categories.append(categories[-1] if categories else None)
+
+        if finished:
+            end_categories.append(categories[-1] if categories else None)
+        else:
+            end_categories.append(map_path_to_categories(df_paths[index]['target'], article_to_category))
     
     # Create DataFrame from the collected category paths
     df_common_paths = pd.DataFrame({
@@ -130,7 +133,8 @@ def analyze_categories_paths(df_paths, df_categories, users=True, omit_loops=Fal
 
     Parameters:
         df_paths (pd.DataFrame): DataFrame containing article paths with a 'path' column. 
-        df_categories (pd.DataFrame): DataFrame mapping articles to main categories, with 'article' and 'level_1' columns. 
+        df_categories (pd.DataFrame): DataFrame mapping articles to main categories, with 'article' and 'level_1' columns.
+        users (bool): True if the dataset contain users paths and false if it contains the optimal paths
         omit_loops (bool): Optional; if True, removes consecutive repetitions of the same category within a path. 
 
     Returns:
@@ -175,6 +179,7 @@ def analyze_categories_paths(df_paths, df_categories, users=True, omit_loops=Fal
     df_common_paths = pd.DataFrame(sorted_paths, columns=['Category Path', 'Count'])
     
     return df_common_paths
+
 
 def find_all_source_target_pairs(df_finished, df_unfinished, df_links):
     """
@@ -230,21 +235,20 @@ def count_start_and_target_per_articles(df_finished, df_unfinished, df_article):
 
 def find_shortest_path(row, G):
     """
-    Finds the shortest path between the source and target nodes in a graph.
+    Finds the shortest paths between the source and target nodes in a graph.
 
     Args:
         row (pd.Series): A row containing 'source' and 'target' nodes.
         G (networkx.DiGraph): A directed graph built using NetworkX.
 
     Returns:
-        list or None: The shortest path as a list of nodes if it exists; otherwise None.
+        list or None: The shortest paths as a list of nodes if it exists; otherwise None.
     """
     source, target = row['source'], row['target']
     try:
-        path = nx.shortest_path(G, source=source, target=target)
+        return list(nx.all_shortest_paths(G, source=source, target=target))
     except nx.NetworkXNoPath:
-        path = None  # If no path exists
-    return path
+        return None  # If no path exists
 
 def compare_with_matrix(row, df_shortest_path):
     """
@@ -290,6 +294,7 @@ def calculate_optimal_path(df_links, optimal_paths, df_shortest_path):
 
     # Compute shortest paths and compare with matrix
     optimal_paths['path'] = optimal_paths.apply(find_shortest_path, G=G, axis=1)
+    optimal_paths = optimal_paths.explode('path', ignore_index=True)
     optimal_paths[['computed_length', 'matrix_length', 'matches_matrix']] = \
         optimal_paths.apply(compare_with_matrix, df_shortest_path=df_shortest_path, axis=1, result_type='expand')
 
@@ -303,6 +308,222 @@ def calculate_optimal_path(df_links, optimal_paths, df_shortest_path):
     optimal_paths = optimal_paths.dropna()
 
     return optimal_paths
+
+def map_path_to_categories(path, article_to_category):
+    """
+    Maps a path of articles to their respective categories.
+
+    Parameters:
+    - path: List of article names in a path, or None.
+    - article_to_category: Dictionary mapping articles to categories.
+
+    Returns:
+    - List of categories corresponding to the articles in the path, or None if path is None.
+    """
+    if path is not None:
+        return [article_to_category.get(article, 'Unknown') for article in path]
+    return None
+
+
+def clean_path_list(path):
+    """
+    Cleans a path list by removing occurrences of '<' and the preceding element.
+
+    Parameters:
+    - path: List of elements representing a path.
+
+    Returns:
+    - A cleaned list with '<' and its preceding elements removed.
+    """
+    while '<' in path:
+        idx = path.index('<')
+        del path[idx - 1:idx + 1]  # Remove the element before '<' and '<' itself
+    return path
+
+
+def users_paths(df_finished, df_unfinished, article_to_category):
+    """
+    Processes paths for finished and unfinished users by extracting sources, targets, and path categories.
+
+    Parameters:
+    - df_finished: DataFrame containing finished paths with a 'path_list' column.
+    - df_unfinished: DataFrame containing unfinished paths with a 'path' column (semicolon-separated strings).
+    - article_to_category: Dictionary mapping articles to categories.
+
+    Returns:
+    - Tuple of DataFrames (users_finished, users_unfinished), each containing processed paths and path categories.
+    """
+    # Process finished paths
+    df_finished['source'] = df_finished['path_list'].apply(lambda x: x[0])  # First element in path
+    df_finished['target'] = df_finished['path_list'].apply(lambda x: x[-1])  # Last element in path
+    users_finished = df_finished[['source', 'target', 'path_list']].copy()
+    users_finished['path_list'] = users_finished['path_list'].apply(clean_path_list)
+    users_finished['path_categories'] = users_finished['path_list'].apply(
+        lambda path: map_path_to_categories(path, article_to_category)
+    )
+
+    # Process unfinished paths
+    users_unfinished = df_unfinished[['source', 'target', 'path']].copy()
+    users_unfinished['path'] = users_unfinished['path'].str.split(';')
+    users_unfinished['path'] = users_unfinished['path'].apply(clean_path_list)
+    users_unfinished = users_unfinished[users_unfinished['path'].apply(lambda x: len(x) > 1)]
+    users_unfinished['path_categories'] = users_unfinished['path'].apply(
+        lambda path: map_path_to_categories(path, article_to_category)
+    )
+
+    return users_finished, users_unfinished
+
+
+def filter_pairs(optimal_paths, users_finished, users_unfinished):
+    """
+    Filters and aligns source-target pairs across optimal, finished, and unfinished datasets.
+
+    Parameters:
+    - optimal_paths: DataFrame containing optimal paths with 'source', 'target', and 'computed_length' columns.
+    - users_finished: DataFrame containing finished user paths with 'source' and 'target' columns.
+    - users_unfinished: DataFrame containing unfinished user paths with 'source' and 'target' columns.
+
+    Returns:
+    - Tuple of DataFrames (optimal_fin, users_finished, optimal_unf, users_unfinished) with filtered and aligned pairs.
+    """
+    # Drop pairs where target is in the source article and filter by computed length
+    filtered_pairs = optimal_paths[optimal_paths['computed_length'] > 1][['source', 'target']].apply(tuple, axis=1)
+    optimal_paths = optimal_paths[optimal_paths[['source', 'target']].apply(tuple, axis=1).isin(filtered_pairs)]
+    users_finished = users_finished[users_finished[['source', 'target']].apply(tuple, axis=1).isin(filtered_pairs)]
+    users_unfinished = users_unfinished[users_unfinished[['source', 'target']].apply(tuple, axis=1).isin(filtered_pairs)]
+
+    # Align finished pairs
+    common_pairs = set(optimal_paths[['source', 'target']].apply(tuple, axis=1)) & \
+                   set(users_finished[['source', 'target']].apply(tuple, axis=1))
+    optimal_fin = optimal_paths[optimal_paths[['source', 'target']].apply(tuple, axis=1).isin(common_pairs)]
+    users_finished = users_finished[users_finished[['source', 'target']].apply(tuple, axis=1).isin(common_pairs)]
+
+    # Align unfinished pairs
+    common_pairs = set(optimal_paths[['source', 'target']].apply(tuple, axis=1)) & \
+                   set(users_unfinished[['source', 'target']].apply(tuple, axis=1))
+    optimal_unf = optimal_paths[optimal_paths[['source', 'target']].apply(tuple, axis=1).isin(common_pairs)]
+    users_unfinished = users_unfinished[users_unfinished[['source', 'target']].apply(tuple, axis=1).isin(common_pairs)]
+
+    return optimal_fin, users_finished, optimal_unf, users_unfinished
+
+
+def calculate_group_step_percentages(group, unfinished):
+    """
+    Calculates the percentage of categories at each step within a group.
+
+    Parameters:
+    - group: DataFrame group containing a 'path_categories' column.
+    - unfinished: Boolean indicating if the paths are unfinished (affects slicing logic).
+
+    Returns:
+    - DataFrame with percentage distributions at each step.
+    """
+    paths = pd.DataFrame(group['path_categories'].tolist())
+    if unfinished:
+        paths = paths.iloc[:, 1:]  # Exclude the source
+    else:
+        paths = paths.iloc[:, 1:-1]  # Exclude source and target
+
+    step_percentages = [
+        paths[step].value_counts(normalize=True).rename(f'step_{i+1}') * 100
+        for i, step in enumerate(paths.columns)
+    ]
+    return pd.concat(step_percentages, axis=1).fillna(0)
+
+
+def calculate_step_percentages(optimal_fin, users_finished, optimal_unf, users_unfinished):
+    """
+    Calculates step-wise percentages for optimal, finished, and unfinished paths.
+
+    Parameters:
+    - optimal_fin: DataFrame with optimal finished paths grouped by source and target.
+    - users_finished: DataFrame with finished user paths grouped by source and target.
+    - optimal_unf: DataFrame with optimal unfinished paths grouped by source and target.
+    - users_unfinished: DataFrame with unfinished user paths grouped by source and target.
+
+    Returns:
+    - Tuple of DataFrames (S_T_opt_fin_percentages, S_T_fin_percentages, S_T_opt_unf_percentages, S_T_unf_percentages)
+      containing step-wise percentage distributions for each dataset.
+    """
+    S_T_opt_fin_percentages = optimal_fin.groupby(['source', 'target']).apply(
+        lambda g: calculate_group_step_percentages(g, unfinished=False)
+    )
+    S_T_fin_percentages = users_finished.groupby(['source', 'target']).apply(
+        lambda g: calculate_group_step_percentages(g, unfinished=False)
+    )
+    S_T_opt_unf_percentages = optimal_unf.groupby(['source', 'target']).apply(
+        lambda g: calculate_group_step_percentages(g, unfinished=False)
+    )
+    S_T_unf_percentages = users_unfinished.groupby(['source', 'target']).apply(
+        lambda g: calculate_group_step_percentages(g, unfinished=True)
+    )
+    return S_T_opt_fin_percentages, S_T_fin_percentages, S_T_opt_unf_percentages, S_T_unf_percentages
+
+
+def calculate_average_percentages(dataframes, column_names):
+    """
+    Calculates the average percentages for the provided dataframes and renames columns.
+
+    Parameters:
+    - dataframes: List of tuples, where each tuple contains a DataFrame and its new column suffix.
+    - column_names: List of column names to rename in the format ['source', 'target', 'categories', 'suffix'].
+
+    Returns:
+    - List of processed DataFrames with renamed columns.
+    """
+    results = []
+    for df, suffix in dataframes:
+        avg_df = df.mean(axis=1, skipna=True).reset_index()
+        avg_df.columns = column_names[:3] + [f'percentage_{suffix}']
+        results.append(avg_df)
+    return results
+
+
+def merge_and_calculate_difference(df1, df2, key_columns, diff_columns):
+    """
+    Merges two DataFrames and calculates the difference between specified columns.
+
+    Parameters:
+    - df1, df2: DataFrames to merge.
+    - key_columns: List of column names to merge on.
+    - diff_columns: Tuple with column names to calculate the difference (e.g., ('percentage_fin', 'percentage_opt')).
+
+    Returns:
+    - A merged DataFrame with an additional column for the calculated difference.
+    """
+    merged_df = pd.merge(df1, df2, on=key_columns, how='outer').fillna(0)
+    merged_df['percentage_diff'] = merged_df[diff_columns[0]] - merged_df[diff_columns[1]]
+    return merged_df
+
+def process_category_means(diff_df, article_to_category):
+    """
+    Processes category means.
+
+    Parameters:
+    - diff_df: DataFrame containing source, target, categories, and percentage_diff.
+    - article_to_category: Mapping of articles to categories.
+
+    Returns:
+    - Processed DataFrame with mean percentage differences by category.
+    """
+    # Ensure all categories are present
+    category_means = diff_df.groupby(['source', 'target', 'categories'])['percentage_diff'].mean().reset_index()
+    category_means = category_means.set_index(['source', 'target', 'categories']).unstack(fill_value=0).stack().reset_index()
+
+    # Map source and target to their respective categories
+    category_means['source_category'] = category_means['source'].map(article_to_category)
+    category_means['target_category'] = category_means['target'].map(article_to_category)
+    category_means['source_target'] = category_means['source_category'] + ' -> ' + category_means['target_category']
+
+    # Group by source-target-category combination and calculate mean percentage_diff
+    category_means_norm = category_means.groupby(
+        ['source_category', 'target_category', 'source_target', 'categories']
+    )['percentage_diff'].mean().reset_index()
+
+    # Generate aggregated data for plotting
+    category_means = pd.DataFrame(category_means.groupby('categories')['percentage_diff'].mean().reset_index())
+    category_means_norm = pd.DataFrame(category_means_norm.groupby('categories')['percentage_diff'].mean().reset_index())
+    return category_means, category_means_norm
 
 def filter_most_specific_category(df_categories):
     """
@@ -485,68 +706,69 @@ def plot_normalized_position_bar(df_position, title="Normalized Category Frequen
     # Show the interactive plot
     fig.show()
     
-def check_voyage_status(paths, finished, n, voyage_categories = ['Geography', 'Countries']):
+# def check_voyage_status(paths, finished, n, voyage_categories = ['Geography', 'Countries']):
+#     """
+#     Check if the category path is voyage or not voyage, that is whether the first n categories after the first are 'Geography' or 'Countries'. 
+
+#     Parameters:
+#         paths (str): A category path in the form 'Geography -> Countries -> Geography'.
+#         finished (bool): Whether the path is finished or not finished.
+#         n (int): Number of different categories following the first to consider.
+
+#     Returns:
+#         bool: True if the path is a 'voyage', False otherwise.
+#     """    
+#     # Ensure that paths is a string
+#     if not isinstance(paths, str):
+#         return False  # Return False for invalid paths
+
+#     # Split the category path
+#     categories = paths.split(' -> ')
+#     path_len = len(categories)
+    
+#     # Exclude paths that start with categories on voyage_categories
+#     if categories[0] in voyage_categories or categories[-1] in voyage_categories:
+#         return False
+    
+#     if finished: 
+#         # Case 1: Path with 1 category -> always False
+#         if path_len <= 2:
+#             return False
+#         # Case 2: Path length between 3 and n+2 -> check middle categories
+#         elif 2 < path_len <= n + 2:
+#             return any(category in categories[1:-1] for category in voyage_categories)
+#         # Case 3: Path longer than n+2 -> check the first n categories after the first
+#         else:
+#             return any(category in categories[1:n+1] for category in voyage_categories)
+        
+#     else: 
+#         # Case 1: Path with 1 or 2 categories -> always False
+#         if path_len <= 1:
+#             return False
+#         # Case 2: Path length between 3 and n+2 -> check middle categories
+#         elif 1 < path_len <= n + 1:
+#             return any(category in categories[1:] for category in voyage_categories)
+#         # Case 3: Path longer than n+2 -> check the first n categories after the first
+#         else:
+#             return any(category in categories[1:n+1] for category in voyage_categories)
+        
+def check_voyage_status(row, voyage_categories):
     """
-    Check if the category path is voyage or not voyage, that is whether the first n categories after the first are 'Geography' or 'Countries'. 
+    Check if the category path is voyage or not voyage, that is whether categories (not source and target) are 'Geography' or 'Countries'. 
 
     Parameters:
-        paths (str): A category path in the form 'Geography -> Countries -> Geography'.
-        finished (bool): Whether the path is finished or not finished.
-        n (int): Number of different categories following the first to consider.
+        row: A row of a dataframe containing information about paths and categories.
+        voyage_categories (list): List of first or second or third level of categories we want to keep.
 
     Returns:
         bool: True if the path is a 'voyage', False otherwise.
     """    
-    # Ensure that paths is a string
-    if not isinstance(paths, str):
-        return False  # Return False for invalid paths
-
-    # Split the category path
-    categories = paths.split(' -> ')
-    path_len = len(categories)
     
-    # Exclude paths that start with categories on voyage_categories
-    if categories[0] in voyage_categories or categories[-1] in voyage_categories:
+    if any(voyage_category in row['end_maincategory'] for voyage_category in voyage_categories) or any(voyage_category in row['start_maincategory'] for voyage_category in voyage_categories):
         return False
-    
-    if finished: 
-        # Case 1: Path with 1 category -> always False
-        if path_len <= 2:
-            return False
-        # Case 2: Path length between 3 and n+2 -> check middle categories
-        elif 2 < path_len <= n + 2:
-            return any(category in categories[1:-1] for category in voyage_categories)
-        # Case 3: Path longer than n+2 -> check the first n categories after the first
-        else:
-            return any(category in categories[1:n+1] for category in voyage_categories)
-        
-    else: 
-        # Case 1: Path with 1 or 2 categories -> always False
-        if path_len <= 1:
-            return False
-        # Case 2: Path length between 3 and n+2 -> check middle categories
-        elif 1 < path_len <= n + 1:
-            return any(category in categories[1:] for category in voyage_categories)
-        # Case 3: Path longer than n+2 -> check the first n categories after the first
-        else:
-            return any(category in categories[1:n+1] for category in voyage_categories)
+    else: return any(any(voyage_category in category for voyage_category in voyage_categories) for category in row['Category Path'])
 
-def category_voyage_sorting(category_paths, finished, n=3):
-    """
-    Adds a boolean column filtering paths into voyage or not voyage, that is whether the first n categories after the first are 'Geography' or 'Countries' 
-
-    Parameters:
-        category_paths (DataFrame): DataFrame with 'Category Path' column
-        finished (Boolean): whetehr the paths are finished 
-        n (int): number of different categories following the first to consider 
-
-    Returns:
-        DataFrame: category paths with an additional 'voyage' column marked as True or False
-    """    
-    category_paths['voyage'] = category_paths['Category Path'].apply(lambda p: check_voyage_status(p, finished, n)) 
-    return category_paths 
-
-def game_voyage_sorting(df_article_paths, df_categories, finished, n=3, voyage_categories = ['Geography', 'Countries']):
+def game_voyage_sorting(df_article_paths, df_categories, voyage_categories = ['Geography of Great Britain', 'Geography of Asia', 'Geography of Oceania Australasia', 'North American Geography', 'European Geography', 'African Geography', 'Central and South American Geography', 'Antarctica', 'Geography of the Middle East', 'African Countries', 'Countries']):
     """
     Adds a boolean 'voyage' column to each game.
     First maps articles to categories (requirement for using check_voyage_status()), then checks if the category path qualifies as a 'voyage'.
@@ -554,22 +776,22 @@ def game_voyage_sorting(df_article_paths, df_categories, finished, n=3, voyage_c
     Parameters:
         df_article_path (DataFrame): DataFrame with 'path' column containing article paths
         df_categories (DataFrame): DataFrame with 'article' and 'level_1' columns for mapping
-        n (int): Number of different categories following the first to consider for voyage condition
-        finished (bool): Indicates whether the paths are finished 
+        voyage_categories (list): List of first or second or third level of categories we want to keep.
 
     Returns:
-        DataFrame: Original DataFrame with an additional 'voyage' column (True/False).
+        DataFrame: Original DataFrame with a additional columns.
     """
     # Map articles to their main categories
-    category_path_df = get_main_categories_paths(df_article_paths, df_categories, omit_loops=True)
+    category_path_df = get_main_categories_paths(df_article_paths, df_categories, omit_loops=True, one_level=False)
     
     # Apply the transformation and check voyage status
     df_article_paths['Category Path'] = category_path_df['Category Path']
     df_article_paths['start_maincategory'] = category_path_df['start_maincategory']
     df_article_paths['end_maincategory'] = category_path_df['end_maincategory']
-    df_article_paths['voyage'] = df_article_paths['Category Path'].apply(lambda p: check_voyage_status(p, finished, n, voyage_categories=voyage_categories))
+    df_article_paths['voyage'] = df_article_paths.apply(lambda row: check_voyage_status(row, voyage_categories), axis=1)
     
     return df_article_paths
+
 
 def plot_sankey_voyage(paths):
     """
@@ -582,11 +804,11 @@ def plot_sankey_voyage(paths):
         None: it displays the Sankey diagram 
     """
 
-    voyage_categories = ['Geography', 'Countries']
+    voyage_categories = ['Geography of Great Britain', 'Geography of Asia', 'Geography of Oceania Australasia', 'North American Geography', 'European Geography', 'African Geography', 'Central and South American Geography', 'Antarctica', 'Geography of the Middle East','Countries']
     
     # Mapping for start, voyage, and end nodes
-    paths['start_category_label'] = paths['start_maincategory'].apply(lambda x: 'First in Countries/Geography' if x in voyage_categories else 'First not in Countries/Geography')
-    paths['end_category_label'] = paths['end_maincategory'].apply(lambda x: 'Target in Countries/Geography' if x in voyage_categories else 'Target not in Countries/Geography')
+    paths['start_category_label'] = paths['start_maincategory'].apply(lambda x: 'First in Countries/Geography' if any(voyage_category in x for voyage_category in voyage_categories) else 'First not in Countries/Geography')
+    paths['end_category_label'] = paths['end_maincategory'].apply(lambda x: 'Target in Countries/Geography' if any(voyage_category in x for voyage_category in voyage_categories) else 'Target not in Countries/Geography')
     paths['voyage_label'] = paths['voyage'].apply(lambda x: 'Voyage' if x else 'Non-Voyage')
 
     # Start→Voyage flows

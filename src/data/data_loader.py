@@ -23,6 +23,11 @@ def read_all():
     df_scat = read_categories_matrix()
 
     df_article = pd.DataFrame(df_article_names).copy()
+    print("df_article_names length:", len(df_article_names))
+    print("df_links length (unique linkTarget):", len(df_links['linkTarget'].unique()))
+    print("df_links length (unique linkSource):", len(df_links['linkSource'].unique()))
+    print("df_html_stats length:", len(df_html_stats))
+    print("df_categories length:", len(df_categories))
 
     # Compute in-degree (number of times each article is a target link)
     in_degree = df_links.groupby('linkTarget').size().reset_index(name="in_degree")
@@ -31,22 +36,24 @@ def read_all():
 
     # Merge in-degree and out-degree with df_article_names
     df_article = df_article.merge(in_degree, left_on='article', right_on='linkTarget', how='left')
+    print("After merging in_degree:", len(df_article))
     df_article = df_article.merge(out_degree, left_on='article', right_on='linkSource', how='left')
+    print("After merging out_degree:", len(df_article))
     df_article = df_article.drop(columns=['linkTarget', 'linkSource'])
-
+    print("After dropping columns:", len(df_article))
     # Fill NaN values with 0, assuming no links imply zero counts for those articles
     df_article = df_article.fillna(0).astype({'in_degree': 'int', 'out_degree': 'int'})
 
     # add the html stats to the articles
     df_html_stats = df_html_stats.rename(columns={'article_name': 'article'})
-    df_article = pd.merge(df_article, df_html_stats, how='inner')
-
+    df_article = pd.merge(df_article, df_html_stats, how='left')
+    print("After merging df_html_stats:", len(df_article))
     # Attributing the main category to articles with multiple categories based on the category with fewer total articles
     df_categories = filter_most_specific_category(df_categories)
     # add the category (level_1) to each articles
     category_map = dict(zip(df_categories["article"], df_categories["level_1"]))
     df_article["category"] = df_article["article"].map(category_map)
-
+    print("After merging df_categories:", len(df_article))
     # let's add some useful metrics to each paths dataframe: shortest path, semantic similarity
     df_unfinished['cosine_similarity'] = df_unfinished.apply(lambda x: find_shortest_distance(x, df_sm), axis=1)
     df_unfinished['shortest_path'] = df_unfinished.apply(lambda x: find_shortest_distance(x, df_shortest_path), axis=1)
