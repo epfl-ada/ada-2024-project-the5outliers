@@ -24,15 +24,18 @@ class HTMLParser:
         for i in tqdm(range(len(self.article_names))):
             self.parsed_articles[self.article_names.iloc[i]] = self.parse_html_article(self.article_URLs[i])
 
-    def parse_selection(self, indices):
+    def parse_save_valid(self, articles_to_parse):
         '''
-        Parse a selection of valid articles (those with the indices of self.article_names passed)
-        For instance, to get all the same articles as in paths-and-graph:
-        indices = [i for i in df_html_articles.index if df_html_articles[i] in df_article_names.values]
+        Parse a selection of valid html articles, for instance only those used in the project
         '''
+
+        self.parsed_articles = {} # clean parsed articles
+        indices = [i for i in self.article_names.index if self.article_names[i] in articles_to_parse.values]
 
         for i in tqdm(indices):
             self.parsed_articles[self.article_names.iloc[i]] = self.parse_html_article(self.article_URLs[i])
+
+        self.save_pickle()
 
     def parse_html_article(self, filename):
         '''

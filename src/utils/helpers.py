@@ -786,7 +786,6 @@ def game_voyage_sorting(df_article_paths, df_categories, voyage_categories = ['G
     
     # Apply the transformation and check voyage status
     df_article_paths['Category Path'] = category_path_df['Category Path']
-    #print(df_article_paths[0:3]['Category Path'])
     df_article_paths['start_maincategory'] = category_path_df['start_maincategory']
     df_article_paths['end_maincategory'] = category_path_df['end_maincategory']
     df_article_paths['voyage'] = df_article_paths.apply(lambda row: check_voyage_status(row, voyage_categories), axis=1)
