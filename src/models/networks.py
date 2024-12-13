@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import plotly.graph_objects as go
+
 
 def build_network(df_paths, df_categories, include_self_loops=True):
     """
@@ -182,3 +184,164 @@ def plot_network(H, title="Network Graph", node_size=700, show_edge_labels=True,
     ax_network.axis("off")  
     plt.tight_layout()
     plt.show()
+
+
+
+
+
+##### article network 1 click -----------------------------------------------------------------
+
+
+def build_article_network(paths_click, article_to_category, palette, include_self_loops=False):
+    '''
+    builds network of article
+    parameters:
+    - paths_click(df) dataframe that contains a column 'click_1'
+    - palette(dict,optional)
+    - include_self_loops(boolean, optional): weather to allow self loops
+    
+    ??-------> do we want node size to be in degree or both in and out? directed first click
+    
+    returns: the network 
+    
+    check structure using:
+        print(G.nodes(data=True))
+        print(G.edges(data=True))
+    '''
+    G = nx.DiGraph()
+
+    # Create nodes and edges
+    for source, target in paths_click['click_1']:
+        # add nodes and edges defined in 'click_1' if they are not already in the network, else increment their wheight
+        if source != target or include_self_loops:
+            if G.has_edge(source, target):
+                G[source][target]['weight'] += 1
+            else:
+                G.add_edge(source, target, weight=1)
+
+        # node atributes: position and color
+        for node in [source, target]:
+            if node not in G.nodes:
+                G.add_node(node)  
+            # Set or update node attributes
+            category = article_to_category.get(node, 'Others')  # Default to 'Others' if not found
+            color = palette.get(category, '#666666')  # Default to 'Others' gray
+            G.nodes[node]['category'] = category
+            G.nodes[node]['color'] = color
+
+    # Generate nodes positions using spring layout 
+    pos = nx.spring_layout(G, seed=42)
+    for node, position in pos.items():
+        G.nodes[node]['pos'] = position
+
+    # Update node sizes based on degree (total degree: in-degree + out-degree)
+    max_degree = max([G.in_degree(node) + G.out_degree(node) for node in G.nodes()]) # Normalize node sizes to a fixed range
+    for node in G.nodes():
+        degree = G.in_degree(node) + G.out_degree(node)
+        G.nodes[node]['size'] = np.interp(degree, [0, max_degree], [7, 30])  # Sizes between 7 and 30
+
+    return G
+
+def plot_article_network(G, palette_category_dict):
+    """
+    Plot article network of first user clicks (all paths, finished and unfinished) using plotly.
+
+    Parameters:
+    G (networkx.DiGraph): directed graph where:
+        - nodes have attributes:
+          - 'pos': (array-like) 2D position (defined when creating network)
+          - 'color': Hex color code (defined when creating network)
+        - edges have attributes:
+          - 'weight': Numerical value representing edge strength : number of times the click was made
+
+    Returns:
+    - None: Displays an interactive Plotly visualization of the graph.
+
+    To use : 
+    G=build_article_network(paths_first_click,article_to_category)
+    G=filter_network(G, weight_threshold=20)
+    plot_article_network(G)
+    """
+    # Edge data: position and thickness ----------------------------------------
+    edge_x = []
+    edge_y = []
+    edge_weights = []
+
+    for edge in G.edges(data=True):
+        x0, y0 = G.nodes[edge[0]]['pos']
+        x1, y1 = G.nodes[edge[1]]['pos']
+        edge_x.extend([x0, x1, None])
+        edge_y.extend([y0, y1, None])
+        edge_weights.append(edge[2]['weight'])
+
+    edge_trace = go.Scatter(
+        x=edge_x,
+        y=edge_y,
+        line=dict(width=0.5, color='#888'),
+        hoverinfo='none',
+        mode='lines',
+        showlegend=False
+    )
+
+    # Node data : position, color and size --------------------------------------
+    node_x = []
+    node_y = []
+    node_sizes = []
+    node_colors = []
+    node_text = []
+
+    for node, data in G.nodes(data=True):
+        x, y = data['pos']
+        node_x.append(x)
+        node_y.append(y)
+        node_sizes.append(data['size'])
+        node_colors.append(data['color'])
+        node_text.append(f"{node}<br>Category: {data['category']}<br>Degree: {G.degree(node)}")
+
+    node_trace = go.Scatter(
+        x=node_x,
+        y=node_y,
+        mode='markers',
+        hoverinfo='text',
+        marker=dict(
+            size=node_sizes,
+            color=node_colors,
+            line_width=2
+        ),
+        text=node_text,
+        showlegend=False  # Disable the legend entry for edges
+    )
+
+    # Create figure ----------------------------------------------------------------
+    fig = go.Figure(data=[edge_trace, node_trace])
+
+    # Add legend for categories: add one trace for each category, which is invisible in the graph but shows up in the legend.
+    for category, color in palette_category_dict.items():
+        fig.add_trace(
+            go.Scatter(
+                x=[None],  # Invisible points
+                y=[None],
+                mode='markers',
+                marker=dict(size=10, color=color),
+                name=category
+            )
+        )
+
+    # Set layout
+    fig.update_layout(
+        showlegend=True,
+        legend=dict(
+            x=1.05,
+            y=1,
+            bgcolor='rgba(255, 255, 255, 0.5)',
+            bordercolor='black',
+            borderwidth=1,
+            title='Categories'
+        ),
+        xaxis=dict(showgrid=False, zeroline=False),
+        yaxis=dict(showgrid=False, zeroline=False),
+        title="Network graph of major articles",
+        margin=dict(l=0, r=0, t=40, b=0),
+    )
+
+    fig.show()
