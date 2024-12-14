@@ -68,9 +68,44 @@ def create_treemap_data(df):
 
     return labels, parents, values, ids
 
+def voyages_categories(df_categories_filtered, voyage_categories):
+    """
+    Processes a DataFrame to standardize and categorize subject categories, 
+    specifically handling those related to 'Voyages'.
+
+    Steps:
+    1. Strips the prefix 'subject.' from values in the 'category' column if it exists.
+    2. Replaces categories containing any string from `voyage_categories` with 'Voyages'.
+    3. Updates rows where 'category' is 'Voyages':
+       - Sets 'level_1' to 'Voyages'.
+       - Sets 'level_2' and 'level_3' to None.
+
+    Parameters:
+    ----------
+    df_categories_filtered : pandas.DataFrame
+        A DataFrame containing a 'category' column and hierarchical columns 
+        ('level_1', 'level_2', 'level_3') to represent category levels.
+
+    Returns:
+    -------
+    pandas.DataFrame
+        The updated DataFrame with processed categories and hierarchy levels.
+    """
+    df_categories_filtered['category'] = df_categories_filtered['category'].apply(
+        lambda category: category.split('subject.', 1)[-1] if 'subject.' in category else category
+    )
+    df_categories_filtered['category'] = [
+        'Voyages' if any(voyage in category for voyage in voyage_categories) else category
+        for category in df_categories_filtered['category']
+    ]
+    # Updating level_1, level_2, and level_3 based on 'Voyages' in 'category'
+    df_categories_filtered.loc[df_categories_filtered['category'] == 'Voyages', ['level_1', 'level_2', 'level_3']] = ['Voyages', None, None]
+    return df_categories_filtered
+
+
 def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_level=True, finished=True):
     """
-    Give common category paths from article paths and start-end categories.
+    Give category paths from article paths and start-end categories.
 
     Parameters:
         df_paths (pd.DataFrame): DataFrame containing article paths with a 'path' column. 
@@ -121,8 +156,8 @@ def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_lev
     # Create DataFrame from the collected category paths
     df_common_paths = pd.DataFrame({
         'Category Path': category_paths,
-        'start_maincategory': start_categories,
-        'end_maincategory': end_categories
+        'source_maincategory': start_categories,
+        'target_maincategory': end_categories
     })
     
     return df_common_paths
@@ -751,32 +786,32 @@ def plot_normalized_position_bar(df_position, title="Normalized Category Frequen
 #         # Case 3: Path longer than n+2 -> check the first n categories after the first
 #         else:
 #             return any(category in categories[1:n+1] for category in voyage_categories)
+    
+
         
-def check_voyage_status(row, voyage_categories):
+def check_voyage_status(row):
     """
-    Check if the category path is voyage or not voyage, that is whether categories (not source and target) are 'Geography' or 'Countries'. 
+    Check if the path is a Wikispeedia_Voyage, that is whether categories (not source and target) are 'Voyages'. 
 
     Parameters:
         row: A row of a dataframe containing information about paths and categories.
-        voyage_categories (list): List of first or second or third level of categories we want to keep.
 
     Returns:
-        bool: True if the path is a 'voyage', False otherwise.
+        bool: True if the path is a Wikispeedia_Voyage, False otherwise.
     """    
     
-    if any(voyage_category in row['end_maincategory'] for voyage_category in voyage_categories) or any(voyage_category in row['start_maincategory'] for voyage_category in voyage_categories):
+    if row['target_maincategory']=='Voyages' or row['source_maincategory']=='Voyages':
         return False
-    else: return any(any(voyage_category in category for voyage_category in voyage_categories) for category in row['Category Path'])
+    else: return any('Voyages' in category for category in row['Category Path'])
 
-def game_voyage_sorting(df_article_paths, df_categories, voyage_categories = ['Geography of Great Britain', 'Geography of Asia', 'Geography of Oceania Australasia', 'North American Geography', 'European Geography', 'African Geography', 'Central and South American Geography', 'Antarctica', 'Geography of the Middle East', 'African Countries', 'Countries']):
+def game_voyage_sorting(df_article_paths, df_categories):
     """
-    Adds a boolean 'voyage' column to each game.
-    First maps articles to categories (requirement for using check_voyage_status()), then checks if the category path qualifies as a 'voyage'.
+    Adds a boolean 'Wikispeedia_Voyage' column to each game.
+    First maps articles to categories (requirement for using check_voyage_status()), then checks if the category path qualifies as a Wikispeedia_Voyage.
 
     Parameters:
         df_article_path (DataFrame): DataFrame with 'path' column containing article paths
-        df_categories (DataFrame): DataFrame with 'article' and 'level_1' columns for mapping
-        voyage_categories (list): List of first or second or third level of categories we want to keep.
+        df_categories (DataFrame): DataFrame with 'article' and categories columns for mapping
 
     Returns:
         DataFrame: Original DataFrame with a additional columns.
@@ -786,9 +821,9 @@ def game_voyage_sorting(df_article_paths, df_categories, voyage_categories = ['G
     
     # Apply the transformation and check voyage status
     df_article_paths['Category Path'] = category_path_df['Category Path']
-    df_article_paths['start_maincategory'] = category_path_df['start_maincategory']
-    df_article_paths['end_maincategory'] = category_path_df['end_maincategory']
-    df_article_paths['voyage'] = df_article_paths.apply(lambda row: check_voyage_status(row, voyage_categories), axis=1)
+    df_article_paths['source_maincategory'] = category_path_df['source_maincategory']
+    df_article_paths['target_maincategory'] = category_path_df['target_maincategory']
+    df_article_paths['Wikispeedia_Voyage'] = df_article_paths.apply(lambda row: check_voyage_status(row), axis=1)
     
     return df_article_paths
 
