@@ -151,9 +151,9 @@ def category_jaccard_similarity(categories, level_weights):
     return similarity_weighted_jaccard_df  
 
 def compute_save_all():
-    '''Call this function from the base of the repo. Computes article embeddings and the two similarity matrices and saves them to data.
-    This saves the similarity matrix in data for safety, but needs to be moved in paths and graphs to be used'''
+    '''Call this function from the base of the repo. Computes article embeddings, the two similarity matrices and the articles parsed and saves them to data.'''
     from src.data.data_loader import read_articles , read_categories
+    from src.utils.HTMLParser import HTMLParser
 
     df_article_names = read_articles()
 
@@ -165,6 +165,9 @@ def compute_save_all():
     df_scat = df_scat.loc[df_article_names, df_article_names]
     df_scat = df_scat.astype(np.float32)
 
-    np.save('./data/embedded_articles.npy', embeddings)
-    np.save('./data/similarity_matrix.npy', similarity_matrix)
-    np.save('./data/category_jaccard_similarity.npy', df_scat)
+    parser = HTMLParser()
+    parser.parse_save_valid(df_article_names) # saves to pickle file
+
+    np.save('./data/paths-and-graph/embedded_articles.npy', embeddings)
+    np.save('./data/paths-and-graph/similarity_matrix.npy', similarity_matrix)
+    np.save('./data/paths-and-graph/category_jaccard_similarity.npy', df_scat)
