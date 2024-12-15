@@ -104,6 +104,40 @@ def assign_world_region_categories(df_categories, world_region_categories):
     df_categories_filtered.loc[df_categories_filtered['category'] == 'World Region', ['level_1', 'level_2', 'level_3']] = ['World Region', None, None]
     return df_categories_filtered
 
+def voyages_categories(df_categories_filtered, voyage_categories):
+    """
+    Processes a DataFrame to standardize and categorize subject categories, 
+    specifically handling those related to 'Voyages'.
+
+    Steps:
+    1. Strips the prefix 'subject.' from values in the 'category' column if it exists.
+    2. Replaces categories containing any string from `voyage_categories` with 'Voyages'.
+    3. Updates rows where 'category' is 'Voyages':
+       - Sets 'level_1' to 'Voyages'.
+       - Sets 'level_2' and 'level_3' to None.
+
+    Parameters:
+    ----------
+    df_categories_filtered : pandas.DataFrame
+        A DataFrame containing a 'category' column and hierarchical columns 
+        ('level_1', 'level_2', 'level_3') to represent category levels.
+
+    Returns:
+    -------
+    pandas.DataFrame
+        The updated DataFrame with processed categories and hierarchy levels.
+    """
+    df_categories_filtered['category'] = df_categories_filtered['category'].apply(
+        lambda category: category.split('subject.', 1)[-1] if 'subject.' in category else category
+    )
+    df_categories_filtered['category'] = [
+        'Voyages' if any(voyage in category for voyage in voyage_categories) else category
+        for category in df_categories_filtered['category']
+    ]
+    # Updating level_1, level_2, and level_3 based on 'Voyages' in 'category'
+    df_categories_filtered.loc[df_categories_filtered['category'] == 'Voyages', ['level_1', 'level_2', 'level_3']] = ['Voyages', None, None]
+    return df_categories_filtered
+
 def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_level=True, finished=True):
     """
     Give category paths from article paths and start-end categories.
@@ -1478,7 +1512,7 @@ def remove_outliers(df, col):
 
 
 def plot_difficulties_voyage (df_finished_voyage, df_unfinished_voyage, palette_category_dict):
-    color_voyage = palette_category_dict["Voyages"]
+    color_voyage = palette_category_dict['World Region']
     
     df_finished_voyage["finished"] = True
     df_finished_voyage["cte"] = 1
@@ -1728,3 +1762,46 @@ def compute_proba_path(path, cat_to_cat_proba_df):
     for i in range(min(len(path)-1, 1)):
         proba_path *= cat_to_cat_proba_df[path[i]][path[i+1]]
     return proba_path #** (1 / (len(path)))
+
+def location_click_on_page(df_finished, parser):
+    df_finished['position'] = np.NaN
+
+    for i in range(len(df_finished)):
+        articles = df_finished['path'][i].split(';')
+        
+        position = []
+        for a in range(len(articles)-1):
+            if articles[a+1] == '<' or articles[a] == '<':
+                continue
+            else:
+                info = parser.find_link_positions(articles[a], articles[a+1])
+                position.append(info['article_link_position'][0]/info['total_links'] if len(info['article_link_position']) != 0 else np.NaN)
+        df_finished.loc[i, 'position'] = np.mean(position)
+    return df_finished
+
+from tqdm import tqdm
+
+def find_category_position_articles(parser, df_categories, categories_others) :
+
+    def mean_link_position_per_category(parser, df_categories, category= "Country") : 
+        
+        #parser.parse_all()
+        articles_links = {article: data["total_links"] for article, data in parser.parsed_articles.items()}
+        article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
+        articles_links_voyage = {k: [v_select for v_select in v if v_select in article_to_category.keys() and article_to_category[v_select] == category] for k, v in articles_links.items()}
+        position_voyage = []
+        for article, voyage_list in tqdm(articles_links_voyage.items()):
+            position = []
+            # if category not in list(df_categories[df_categories['article'] == article]["level_1"]) :
+            for a in voyage_list:
+                info = parser.find_link_positions(article, a)
+                position.append(info['article_link_position'][0]/info['total_links'] if len(info['article_link_position']) != 0 else np.NaN)
+            position_voyage.append(np.mean(position))
+            # else :
+            #     position_voyage.append(np.NaN)
+        return position_voyage
+    link_per_cat = {}
+
+    for category in categories_others:
+        link_per_cat[category] = mean_link_position_per_category(parser, df_categories, category=category)
+    return link_per_cat
