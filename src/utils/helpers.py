@@ -68,21 +68,21 @@ def create_treemap_data(df):
 
     return labels, parents, values, ids
 
-def voyages_categories(df_categories_filtered, voyage_categories):
+def assign_world_region_categories(df_categories, world_region_categories):
     """
     Processes a DataFrame to standardize and categorize subject categories, 
-    specifically handling those related to 'Voyages'.
+    specifically handling those related to 'World Region'.
 
     Steps:
     1. Strips the prefix 'subject.' from values in the 'category' column if it exists.
-    2. Replaces categories containing any string from `voyage_categories` with 'Voyages'.
-    3. Updates rows where 'category' is 'Voyages':
-       - Sets 'level_1' to 'Voyages'.
+    2. Replaces categories containing any string from `world_region_categories` with 'World Region'.
+    3. Updates rows where 'category' is 'World Region':
+       - Sets 'level_1' to 'World Region'.
        - Sets 'level_2' and 'level_3' to None.
 
     Parameters:
     ----------
-    df_categories_filtered : pandas.DataFrame
+    df_categories : pandas.DataFrame
         A DataFrame containing a 'category' column and hierarchical columns 
         ('level_1', 'level_2', 'level_3') to represent category levels.
 
@@ -91,17 +91,18 @@ def voyages_categories(df_categories_filtered, voyage_categories):
     pandas.DataFrame
         The updated DataFrame with processed categories and hierarchy levels.
     """
+    df_categories_filtered = df_categories.copy()
+
     df_categories_filtered['category'] = df_categories_filtered['category'].apply(
         lambda category: category.split('subject.', 1)[-1] if 'subject.' in category else category
     )
     df_categories_filtered['category'] = [
-        'Voyages' if any(voyage in category for voyage in voyage_categories) else category
+        'World Region' if any(region in category for region in world_region_categories) else category
         for category in df_categories_filtered['category']
     ]
-    # Updating level_1, level_2, and level_3 based on 'Voyages' in 'category'
-    df_categories_filtered.loc[df_categories_filtered['category'] == 'Voyages', ['level_1', 'level_2', 'level_3']] = ['Voyages', None, None]
+    # Updating level_1, level_2, and level_3 based on 'World Region' in 'category'
+    df_categories_filtered.loc[df_categories_filtered['category'] == 'World Region', ['level_1', 'level_2', 'level_3']] = ['World Region', None, None]
     return df_categories_filtered
-
 
 def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_level=True, finished=True):
     """
@@ -800,9 +801,9 @@ def check_voyage_status(row):
         bool: True if the path is a Wikispeedia_Voyage, False otherwise.
     """    
     
-    if row['target_maincategory']=='Voyages' or row['source_maincategory']=='Voyages':
+    if row['target_maincategory']=='World Region' or row['source_maincategory']=='World Region':
         return False
-    else: return any('Voyages' in category for category in row['Category Path'])
+    else: return any('World Region' in category for category in row['Category Path'])
 
 def game_voyage_sorting(df_article_paths, df_categories):
     """
