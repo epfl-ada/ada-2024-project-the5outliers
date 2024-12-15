@@ -911,8 +911,7 @@ def plot_sankey_voyage(df_all_voyage):
     )
     
     fig.show()
-    return None
-    #return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
+    return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
 
 def backtrack(paths) :
     """
