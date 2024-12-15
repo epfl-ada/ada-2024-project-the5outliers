@@ -275,7 +275,7 @@ class HTMLParser:
             if art is None: 
                 continue
             article_stats = {
-                'article_name': art['title'],
+                'article_name': key,
                 'total_words': art['total_words'],
                 'total_links': len(art['total_links']),
                 'link_density': len(art['total_links']) / art['total_words'],
