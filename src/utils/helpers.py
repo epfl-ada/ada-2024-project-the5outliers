@@ -197,6 +197,7 @@ def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_lev
     
     return df_common_paths
     
+
 def analyze_categories_paths(df_paths, df_categories, users=True, omit_loops=False):
     """
     Analyze and summarize common category paths from article paths.
@@ -823,7 +824,6 @@ def plot_normalized_position_bar(df_position, title="Normalized Category Frequen
 #             return any(category in categories[1:n+1] for category in voyage_categories)
     
 
-        
 def check_voyage_status(row):
     """
     Check if the path is a Wikispeedia_Voyage, that is whether categories (not source and target) are 'Voyages'. 
@@ -852,10 +852,16 @@ def game_voyage_sorting(df_article_paths, df_categories):
         DataFrame: Original DataFrame with a additional columns.
     """
     # Map articles to their main categories
+    # omit_loops=True thus showing only the transition within categories
     category_path_df = get_main_categories_paths(df_article_paths, df_categories, omit_loops=True, one_level=True)
+
+    # Get the full category path for each article path
+    # omit_loops=False thus showing the full category path
+    category_path_df_loops = get_main_categories_paths(df_article_paths, df_categories, omit_loops=False, one_level=True)
     
     # Apply the transformation and check voyage status
-    df_article_paths['Category Path'] = category_path_df['Category Path']
+    df_article_paths['Transition Category Path'] = category_path_df['Category Path']
+    df_article_paths['Category Path'] = category_path_df_loops['Category Path']
     df_article_paths['source_maincategory'] = category_path_df['source_maincategory']
     df_article_paths['target_maincategory'] = category_path_df['target_maincategory']
     df_article_paths['Wikispeedia_Voyage'] = df_article_paths.apply(lambda row: check_voyage_status(row), axis=1)
@@ -863,12 +869,12 @@ def game_voyage_sorting(df_article_paths, df_categories):
     return df_article_paths
 
 
-def plot_sankey_voyage(df_all_voyage):
+def plot_sankey_voyage(df):
     """
     Plots a Sankey diagram to visualize the distribution of paths classified as 'Voyage' or 'Non-Voyage'.
 
     Parameters:
-        df_all_voyage (DataFrame): DataFrame containing boolean 'Wiki_Voyage' and 'source_maincategory', 'target_maincategory'  columns
+        df (DataFrame): DataFrame containing boolean 'Wiki_Voyage' and 'source_maincategory', 'target_maincategory'  columns
 
     Returns:
         None: it displays the Sankey diagram 
@@ -876,6 +882,8 @@ def plot_sankey_voyage(df_all_voyage):
 
     #voyage_categories = ['Geography of Great Britain', 'Geography of Asia', 'Geography of Oceania Australasia', 'North American Geography', 'European Geography', 'African Geography', 'Central and South American Geography', 'Antarctica', 'Geography of the Middle East','Countries']
     
+    df_all_voyage = df.copy()
+
     # Mapping for start, voyage, and end nodes
     df_all_voyage['source_category_label'] = df_all_voyage['source_maincategory'].apply(lambda x: 'Source is a World Region' if x=='Voyages' else 'Source is not a World Region')
     df_all_voyage['target_category_label'] = df_all_voyage['target_maincategory'].apply(lambda x: 'Target is a World Region' if x=='Voyages' else 'Target is not a World Region')
