@@ -117,8 +117,8 @@ def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_lev
     Returns:
         pd.DataFrame: A DataFrame of the most common category paths, with columns:
             - 'Category Path': The sequence of main categories (with optional loop removal).
-            - 'start_maincategory': The main category of the start.
-            - 'end_maincategory': The main category of the end.
+            - 'source_maincategory': The main category of the start.
+            - 'target_maincategory': The main category of the end.
             
     Notes:
         - Paths are created by mapping each article in 'df_paths' to its primary category from 'df_categories'.
@@ -817,7 +817,7 @@ def game_voyage_sorting(df_article_paths, df_categories):
         DataFrame: Original DataFrame with a additional columns.
     """
     # Map articles to their main categories
-    category_path_df = get_main_categories_paths(df_article_paths, df_categories, omit_loops=True, one_level=False)
+    category_path_df = get_main_categories_paths(df_article_paths, df_categories, omit_loops=True, one_level=True)
     
     # Apply the transformation and check voyage status
     df_article_paths['Category Path'] = category_path_df['Category Path']
@@ -828,34 +828,34 @@ def game_voyage_sorting(df_article_paths, df_categories):
     return df_article_paths
 
 
-def plot_sankey_voyage(paths):
+def plot_sankey_voyage(df_all_voyage):
     """
     Plots a Sankey diagram to visualize the distribution of paths classified as 'Voyage' or 'Non-Voyage'.
 
     Parameters:
-        paths (DataFrame): DataFrame containing 'voyage' and 'start_maincategory', 'end_maincategory'  columns
+        df_all_voyage (DataFrame): DataFrame containing boolean 'Wiki_Voyage' and 'source_maincategory', 'target_maincategory'  columns
 
     Returns:
         None: it displays the Sankey diagram 
     """
 
-    voyage_categories = ['Geography of Great Britain', 'Geography of Asia', 'Geography of Oceania Australasia', 'North American Geography', 'European Geography', 'African Geography', 'Central and South American Geography', 'Antarctica', 'Geography of the Middle East','Countries']
+    #voyage_categories = ['Geography of Great Britain', 'Geography of Asia', 'Geography of Oceania Australasia', 'North American Geography', 'European Geography', 'African Geography', 'Central and South American Geography', 'Antarctica', 'Geography of the Middle East','Countries']
     
     # Mapping for start, voyage, and end nodes
-    paths['start_category_label'] = paths['start_maincategory'].apply(lambda x: 'First in Countries/Geography' if any(voyage_category in x for voyage_category in voyage_categories) else 'First not in Countries/Geography')
-    paths['end_category_label'] = paths['end_maincategory'].apply(lambda x: 'Target in Countries/Geography' if any(voyage_category in x for voyage_category in voyage_categories) else 'Target not in Countries/Geography')
-    paths['voyage_label'] = paths['voyage'].apply(lambda x: 'Voyage' if x else 'Non-Voyage')
+    df_all_voyage['source_category_label'] = df_all_voyage['source_maincategory'].apply(lambda x: 'Source is a World Region' if x=='Voyages' else 'Source is not a World Region')
+    df_all_voyage['target_category_label'] = df_all_voyage['target_maincategory'].apply(lambda x: 'Target is a World Region' if x=='Voyages' else 'Target is not a World Region')
+    df_all_voyage['voyage_label'] = df_all_voyage['Wikispeedia_Voyage'].apply(lambda x: 'Voyages' if x else 'Non Voyages')
 
     # Start→Voyage flows
-    start_voyage_flows = paths.groupby(['start_category_label', 'voyage_label']).size().reset_index(name='count')
+    start_voyage_flows = df_all_voyage.groupby(['source_category_label', 'voyage_label']).size().reset_index(name='count')
 
     # Voyage→End flows
-    voyage_end_flows = paths.groupby(['voyage_label', 'end_category_label']).size().reset_index(name='count')
+    voyage_end_flows = df_all_voyage.groupby(['voyage_label', 'target_category_label']).size().reset_index(name='count')
 
     # Define node labels
-    labels = ['First in Countries/Geography', 'First not in Countries/Geography',
-              'Voyage', 'Non-Voyage',
-              'Target in Countries/Geography', 'Target not in Countries/Geography']
+    labels = ['Source is a World Region', 'Source is not a World Region',
+              'Voyages', 'Non Voyages',
+              'Target is a World Region', 'Target is not a World Region']
 
     # Create mappings for source and target node indices
     label_map = {label: i for i, label in enumerate(labels)}
@@ -867,30 +867,38 @@ def plot_sankey_voyage(paths):
 
     # Add Start→Voyage flows
     for _, row in start_voyage_flows.iterrows():
-        sources.append(label_map[row['start_category_label']])
+        sources.append(label_map[row['source_category_label']])
         targets.append(label_map[row['voyage_label']])
         values.append(row['count'])
 
     # Add Voyage→End flows
     for _, row in voyage_end_flows.iterrows():
         sources.append(label_map[row['voyage_label']])
-        targets.append(label_map[row['end_category_label']])
+        targets.append(label_map[row['target_category_label']])
         values.append(row['count'])
 
     # Define node colors
     node_colors = [
-        "rgba(0, 128, 128, 0.6)",  # First in Countries/Geography
-        "rgba(244, 109, 67, 0.8)",  # First not in Countries/Geography
-        "rgba(0, 128, 128, 0.6)",  # Voyage
-        "rgba(244, 109, 67, 0.8)",  # Non-Voyage
-        "rgba(0, 128, 128, 0.6)",  # Target in Countries/Geography
-        "rgba(244, 109, 67, 0.8)"  # Target not in Countries/Geography
+        '#2CB5AE',  # First in Countries/Geography
+        '#4b4b4b',  # First not in Countries/Geography
+        '#2CB5AE',  # Voyage
+        '#4b4b4b',  # Non-Voyage
+        '#2CB5AE',  # Target in Countries/Geography
+        '#4b4b4b'  # Target not in Countries/Geography
+    ]
+
+    link_colors=['rgba(75, 75, 75, 0.3)',  # not voyage
+        'rgba(75, 75, 75, 0.3)',  # not voyage
+        'rgba(44, 181, 174, 0.3)',  # Voyage
+        'rgba(75, 75, 75, 0.3)',  # not voyage
+        'rgba(75, 75, 75, 0.3)',  # not voyage
+        'rgba(44, 181, 174, 0.3)'  # Voyage
     ]
 
     # Create the Sankey diagram
     fig = go.Figure(data=[go.Sankey(
-        node=dict(pad=15, thickness=20, line=dict(color="white", width=0.1), label=labels, color=node_colors),
-        link=dict(source=sources, target=targets, value=values)
+        node=dict(pad=15, thickness=20, line=dict(color="black", width=0), label=labels, color=node_colors),
+        link=dict(source=sources, target=targets, value=values, hovercolor=link_colors)
     )])
     
     fig.update_layout(
@@ -898,11 +906,13 @@ def plot_sankey_voyage(paths):
         font_size=10,
         title_font_size=14,
         title_x=0.5,
-        plot_bgcolor="white"
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
     )
     
     fig.show()
-    return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
+    return None
+    #return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
 
 def backtrack(paths) :
     """
