@@ -1406,7 +1406,217 @@ def plot_proportion_category_start_stop_pies(df_article, palette, abbreviations=
 
     plt.show()
 
+def plot_metrics_by_category(df_article, metrics, palette_category_dict, category_abbreviations):
+    """
+    Plots bar charts for multiple metrics by category using Plotly.
 
+    Parameters:
+    - df_article (DataFrame): DataFrame containing article data.
+    - metrics (list): List of metric column names to plot.
+    - palette_category_dict (dict): Color palette for the categories.
+    - category_abbreviations (dict): Abbreviations for categories.
+    """
+    # Loop through metrics and plot
+    fig, ax = plt.subplots(2, 3, figsize=(15, 5))
+    
+    for i, metric in enumerate(metrics):
+        row, col = divmod(i, 3)
+        order = df_article.groupby("category")[metric].mean().sort_values(ascending=False).reset_index()["category"]
+        sn.barplot(
+            x="category", 
+            y=metric, 
+            hue="category", 
+            palette=palette_category_dict, 
+            data=df_article, 
+            ax=ax[row, col], 
+            order=order
+        )
+        ax[row, col].set_title(f'{metric.replace("_", " ").capitalize()} by Category')
+        ax[row, col].set_xticklabels([])
+        if row == 0 :
+            ax[row, col].set_xlabel('')
+
+    add_legend_category(fig,palette_category_dict, category_abbreviations)
+
+    plt.suptitle("Articles Complexity by Categories", y=1, fontsize=16)
+    plt.tight_layout()
+    plt.show()
+
+def plot_article_popularity_link_density(df_article, df_finished_voyage, palette_category_dict, category_abbreviations, df_categories_filtered):
+    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+
+    #Plot the most visited articles in finished paths
+    all_articles = []
+    df_finished_voyage['path'].apply(lambda x: all_articles.extend(x.split(';')))
+    df_path_articles = pd.Series(all_articles).value_counts().rename_axis('article_name').reset_index(name='value_counts')
+    df_path_articles["category"]=df_path_articles["article_name"].apply(lambda x: df_categories_filtered[df_categories_filtered["article"]==x]["level_1"].values[0] if len(df_categories_filtered[df_categories_filtered["article"]==x]["category"].values)>0 else "None")
+    df_path_articles = df_path_articles[df_path_articles['article_name'] != '<']
+
+    sn.barplot(x='value_counts', y='article_name', hue="category", palette=palette_category_dict, data=df_path_articles.head(15), ax=ax[0])
+    ax[0].set_title('Most visited articles in paths')
+    ax[0].legend_.remove() 
+
+    for i, metric in enumerate(["in_degree", "out_degree"]):
+        sn.barplot(x=metric, y='article', hue="category", palette=palette_category_dict, data=df_article.sort_values(metric, ascending=False).head(15), ax=ax[i+1])
+        ax[i+1].set_title(f'Articles with the most links ({metric.replace("_", " ").capitalize()}) (without duplicates)')
+        ax[i+1].legend_.remove()
+        ax[i+1].set_ylabel('')
+
+    add_legend_category(fig,palette_category_dict, category_abbreviations)
+    plt.suptitle("Correlation between article popularity and link density", y=1, fontsize=16)
+    plt.tight_layout()
+    plt.show()
+
+
+def remove_outliers(df, col):
+    Q1 = df[col].quantile(0.25)
+    Q3 = df[col].quantile(0.75)
+    IQR = Q3 - Q1
+    filtered_df = df[(df[col] >= (Q1 - 1.5 * IQR)) & (df[col] <= (Q3 + 1.5 * IQR))]
+    return filtered_df
+
+
+def plot_difficulties_voyage (df_finished_voyage, df_unfinished_voyage, palette_category_dict):
+    color_voyage = palette_category_dict["Voyages"]
+    
+    df_finished_voyage["finished"] = True
+    df_finished_voyage["cte"] = 1
+    df_unfinished_voyage["finished"] = False
+    df_unfinished_voyage["cte"] = 1
+    df_voyage = pd.concat([df_finished_voyage, df_unfinished_voyage])
+
+    fig = make_subplots(
+        rows=2, cols=2, 
+        subplot_titles=(
+            "Duration Distribution", 
+            "Completion Ratios", 
+            "Rating Distribution for Voyage Game", 
+            "Rating Distribution for Non-Voyage Game"
+        )
+    )
+
+    # ==== PLOT 1 (Violin Plot: Duration Distribution) ====
+    df_voyage_duration = df_finished_voyage[df_finished_voyage["Wikispeedia_Voyage"] == True]
+    df_voyage_duration = remove_outliers(df_voyage_duration, "durationInSec")
+
+    df_non_voyage_duration = df_finished_voyage[df_finished_voyage["Wikispeedia_Voyage"] == False]
+    df_non_voyage_duration = remove_outliers(df_non_voyage_duration, "durationInSec")
+
+    fig.add_trace(
+        go.Violin(
+            x=df_voyage_duration["cte"], 
+            y=df_voyage_duration["durationInSec"],
+            legendgroup="Yes", 
+            scalegroup="Yes", 
+            name="Voyage",
+            side="negative", 
+            line_color=color_voyage, 
+            box_visible=True,
+            meanline_visible=True,
+            showlegend=False),
+        row=1, col=1
+    )
+    fig.add_trace(
+        go.Violin(
+            x=df_non_voyage_duration["cte"],
+            y=df_non_voyage_duration["durationInSec"],
+            legendgroup="No", 
+            scalegroup="No", 
+            name="Non-Voyage",
+            side="positive", 
+            line_color="gray",
+            box_visible=True,
+            meanline_visible=True,
+            showlegend=False
+        ),
+        row=1, col=1
+    )
+
+    # Axis labels
+    fig.update_yaxes(title_text="Duration (seconds)", row=1, col=1)
+
+    # ==== PLOT 2 (Bar Plot: Completion Ratios) ====
+    df_voyage_comparison = df_voyage.groupby(["finished", "Wikispeedia_Voyage"])[["Wikispeedia_Voyage"]].count() 
+    df_voyage_comparison.columns = ["count"]
+    df_voyage_comparison = df_voyage_comparison.reset_index()
+    df_voyage_comparison = df_voyage_comparison.sort_values(by="finished", ascending=False)
+    df_voyage_comparison["percentage"] = df_voyage_comparison.groupby("Wikispeedia_Voyage")["count"].transform(lambda x: (x / x.sum()) * 100).round(1)
+    df_voyage_comparison["voyage_label"] = df_voyage_comparison["Wikispeedia_Voyage"].map({False: "Non-Voyage", True: "Voyage"})
+    df_voyage_comparison["finished_label"] = df_voyage_comparison["finished"].map({False: "Unfinished", True: "Finished"})
+
+    for voyage_label, color in [("Voyage", color_voyage), ("Non-Voyage", 'gray')]:
+        filtered_data = df_voyage_comparison[df_voyage_comparison["voyage_label"] == voyage_label]
+        fig.add_trace(
+            go.Bar(
+                x=filtered_data["finished_label"],
+                y=filtered_data["count"],
+                text=filtered_data["percentage"],
+                name=voyage_label,
+                marker_color=color,
+                texttemplate="%{text}%",
+            ),
+            row=1, col=2
+        )
+        
+    # Axis labels
+    fig.update_yaxes(title_text="Count", row=1, col=2)
+    fig.update_xaxes(title_text="Path Type", row=1, col=2)    
+        
+    # ==== PLOT 3 (Bar Plot: Rating Distribution for Voyage Games) ====
+    df_voyage_rating = df_finished_voyage[df_finished_voyage["Wikispeedia_Voyage"] == True].copy()
+    df_voyage_rating["rating"] = df_voyage_rating["rating"].fillna('NaN').astype(str)
+    df_voyage_rating = df_voyage_rating.groupby("rating")["rating"].count().reset_index(name="count")
+    df_voyage_rating["count"] = df_voyage_rating["count"] / df_voyage_rating["count"].sum() * 100
+    
+    fig.add_trace(
+        go.Bar(
+            x=df_voyage_rating["rating"], 
+            y=df_voyage_rating["count"], 
+            marker_color=color_voyage, 
+            name="Voyage",
+            showlegend=False
+        ),
+        row=2, col=1
+    )
+
+    # axis labels
+    fig.update_yaxes(title_text="Pourcentage", row=2, col=1)
+    fig.update_xaxes(title_text="Rating", row=2, col=1)
+
+    # ==== PLOT 4 (Bar Plot: Rating Distribution for Non-Voyage Games) ====
+    df_non_voyage_rating = df_finished_voyage[df_finished_voyage["Wikispeedia_Voyage"] == False].copy()
+    df_non_voyage_rating["rating"] = df_non_voyage_rating["rating"].fillna('NaN').astype(str)
+    df_non_voyage_rating = df_non_voyage_rating.groupby("rating")["rating"].count().reset_index(name="count")
+    df_non_voyage_rating["count"] = df_non_voyage_rating["count"] / df_non_voyage_rating["count"].sum() * 100
+
+    fig.add_trace(
+        go.Bar(
+            x=df_non_voyage_rating["rating"], 
+            y=df_non_voyage_rating["count"], 
+            marker_color="gray", 
+            name="Non-Voyage",
+            showlegend=False
+        ),
+        row=2, col=2
+    )
+
+    # axis labels
+    fig.update_yaxes(title_text="Pourcentage", row=2, col=2)
+    fig.update_xaxes(title_text="Rating", row=2, col=2)
+
+    # ==== Final Layout Update ====
+    fig.update_layout(
+        height=1000, width=1000,  # Adjust size of the overall figure
+        title="Summary of Voyage and Non-Voyage Game Metrics",
+        showlegend=True,
+        legend_title="Legend",
+        xaxis_title="Game Type",
+        yaxis_title="Count/Percentage",
+        violingap=0.4, 
+        violinmode="overlay"
+    )
+
+    fig.show()
 
     
 def plot_shortest_paths_matrix(df_shortest_path):
