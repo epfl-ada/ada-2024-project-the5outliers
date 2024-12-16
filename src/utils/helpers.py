@@ -885,9 +885,9 @@ def plot_sankey_voyage(df):
     df_all_voyage = df.copy()
 
     # Mapping for start, voyage, and end nodes
-    df_all_voyage['source_category_label'] = df_all_voyage['source_maincategory'].apply(lambda x: 'Source is a World Region' if x=='Voyages' else 'Source is not a World Region')
-    df_all_voyage['target_category_label'] = df_all_voyage['target_maincategory'].apply(lambda x: 'Target is a World Region' if x=='Voyages' else 'Target is not a World Region')
-    df_all_voyage['voyage_label'] = df_all_voyage['Wikispeedia_Voyage'].apply(lambda x: 'Voyages' if x else 'Non Voyages')
+    df_all_voyage['source_category_label'] = df_all_voyage['source_maincategory'].apply(lambda x: 'Source is a World Region' if x=='World Region' else 'Source is not a World Region')
+    df_all_voyage['target_category_label'] = df_all_voyage['target_maincategory'].apply(lambda x: 'Target is a World Region' if x=='World Region' else 'Target is not a World Region')
+    df_all_voyage['voyage_label'] = df_all_voyage['Wikispeedia_Voyage'].apply(lambda x: 'Voyages' if x else 'Non-Voyages')
 
     # Start→Voyage flows
     start_voyage_flows = df_all_voyage.groupby(['source_category_label', 'voyage_label']).size().reset_index(name='count')
@@ -897,7 +897,7 @@ def plot_sankey_voyage(df):
 
     # Define node labels
     labels = ['Source is a World Region', 'Source is not a World Region',
-              'Voyages', 'Non Voyages',
+              'Voyages', 'Non-Voyages',
               'Target is a World Region', 'Target is not a World Region']
 
     # Create mappings for source and target node indices
