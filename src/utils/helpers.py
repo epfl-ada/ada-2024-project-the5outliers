@@ -898,7 +898,7 @@ def plot_sankey_voyage(df_all_voyage):
     # Create the Sankey diagram
     fig = go.Figure(data=[go.Sankey(
         node=dict(pad=15, thickness=20, line=dict(color="black", width=0), label=labels, color=node_colors),
-        link=dict(source=sources, target=targets, value=values, hovercolor=link_colors)
+        link=dict(source=sources, target=targets, value=values, color= 'rgba(60,60,60,0.3)', hovercolor=link_colors)
     )])
     
     fig.update_layout(
@@ -911,7 +911,8 @@ def plot_sankey_voyage(df_all_voyage):
     )
     
     fig.show()
-    return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
+    return fig
+    #return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
 
 def backtrack(paths) :
     """

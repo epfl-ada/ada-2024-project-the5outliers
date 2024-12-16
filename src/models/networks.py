@@ -4,6 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import plotly.graph_objects as go
+import math
+
 
 
 def build_network(df_paths, df_categories, include_self_loops=True):
@@ -98,92 +100,123 @@ def analyze_edge_weights(G):
     df_stats = pd.DataFrame.from_dict(stats, orient='index', columns=['Edge Weight Statistics'])
     return df_stats
 
-def plot_network(H, title="Network Graph", node_size=700, show_edge_labels=True, node_abbreviations=None):
+def plot_network(H, df_categories, palette, title="Network Graph", node_size=700, show_edge_labels=True, node_abbreviations=None):
     """
-    Plot the directed network graph with a separate subplot for the legend.
+    Plot the directed network graph.
 
     Parameters:
         H (Graph): The directed graph to plot.
+        df_categories (DataFrame): DataFrame with category information for nodes.
+        palette (dict): Dictionary mapping nodes to colors.
         title (str): The title of the plot.
-        node_size (int): Size of the nodes.
+        node_size (int): Base size of the nodes.
         show_edge_labels (bool): Whether to show edge weight labels.
         node_abbreviations (dict): Optional dictionary mapping nodes to their abbreviated labels in the plot.
     """
-    # Create a figure with two subplots: one for the network, one for the legend
-    fig, (ax_network, ax_legend) = plt.subplots(1, 2, figsize=(14, 8), gridspec_kw={'width_ratios': [4, 1]})
+    # FIGURE -------------------------------------------------------------------------
+    fig = plt.figure(figsize=(15, 10), dpi=400)
+    
+    # NODES positions: spring layout----------------------------------------------------
+    pos = nx.spring_layout(H, seed=42, k=0.5, scale=3)
 
-    pos = nx.spring_layout(H, seed=42, k=0.5)  # Layout for consistent spacing
+    # Node sizes: number of articles in the category
+    size_range = [800, 2500]
+    nb_articles_per_category = df_categories.groupby('level_1').agg('count')['article']
+    max_nb_articles = max(nb_articles_per_category.get(node, 0) for node in H.nodes())
+    
+    for node in H.nodes():
+        nb_articles_in_category = nb_articles_per_category.get(node, 0)
+        H.nodes[node]['cat_size'] = nb_articles_in_category
+        #interpolate size of current node from range of category-sizes and range of node-sizes
+        H.nodes[node]['size'] = np.interp(nb_articles_in_category, [0, max_nb_articles], size_range) 
+    
+    node_sizes = [H.nodes[node]['size'] for node in H.nodes()]
+    node_sizes_dict = {node: H.nodes[node]['size'] for node in H.nodes()}
 
-    # Define a color mapping for each node
-    nodes = list(H.nodes)
-    color_palette = plt.cm.Paired.colors  # A list of colors from a color map
-    color_map = {node: color_palette[i % len(color_palette)] for i, node in enumerate(nodes)}
-    node_colors = [color_map[node] for node in H.nodes]
+    # Node colors
+    node_colors = [palette.get(node, '#808080') for node in H.nodes()]
 
-    # Use provided abbreviations or default to full node labels
+    # Node labels: abbreviations or default full labels
     if node_abbreviations:
-        abbrev_labels = {node: node_abbreviations.get(node, node) for node in H.nodes}
+        abbrev_labels = {node: node_abbreviations.get(node, node) for node in H.nodes()}
     else:
-        abbrev_labels = {node: node for node in H.nodes}
+        abbrev_labels = {node: node for node in H.nodes()}
+    
+    # Node label font sizes
+    font_sizes = [np.interp(H.nodes[node]['size'], size_range, [8, 20]) for node in H.nodes()]
 
-    # Draw nodes and labels in the network subplot
-    nx.draw_networkx_nodes(H, pos, ax=ax_network, node_size=node_size, node_color=node_colors, edgecolors="black")
-    nx.draw_networkx_labels(H, pos, ax=ax_network, labels=abbrev_labels, font_size=10, font_weight="bold")
-
-    # Prepare edge attributes
+    # Plot nodes and node labels
+    nx.draw_networkx_nodes(H, pos, node_size=node_sizes, node_color=node_colors, edgecolors="white", linewidths=1.5)
+    for node, font_size in zip(H.nodes, font_sizes):
+        nx.draw_networkx_labels(H, pos, labels={node: abbrev_labels[node]}, font_size=font_size, font_color='white')
+    
+    # EDGES attributes--------------------------------------------------------------------
     all_weights = [H[u][v]['weight'] for u, v in H.edges()]
     max_weight = max(all_weights) if all_weights else 1
-    margin = node_size / 60  # Adjust target margin as needed
 
-    # Draw edges with adjusted arrow arrival points in the network subplot
+    # Edges adjusted width and margins: where arrows land 
     edge_labels = {}
     for u, v in H.edges():
+        # Edges width: count of this transition
         weight = H[u][v]['weight']
-        edge_width = min(weight / max_weight * 5, 5)  # Scale edge width based on weight
+        edge_width = min(weight/max_weight*3, 5)
         nx.draw_networkx_edges(
-            H, pos, ax=ax_network,
+            H, pos,
             edgelist=[(u, v)],
             width=edge_width,
             arrowstyle='-|>',
             arrowsize=15,
-            edge_color='black',
+            edge_color='#3b3b3b',
             connectionstyle=f'arc3,rad=0.1' if H.has_edge(v, u) else 'arc3,rad=0.0',
-            min_source_margin=margin,
-            min_target_margin=margin
+            # Edges length: stops at border of target node v
+            min_source_margin=math.sqrt(node_sizes_dict[u] / math.pi),
+            min_target_margin=math.sqrt(node_sizes_dict[v] / math.pi)
         )
         edge_labels[(u, v)] = f"{weight:.2f}"
 
-    # Draw edge labels if show_edge_labels is True
+    # Draw edge labels if enabled
     if show_edge_labels:
         nx.draw_networkx_edge_labels(
-            H, pos, ax=ax_network,
+            H, pos,
             edge_labels=edge_labels,
             font_size=8,
             label_pos=0.5,
             bbox=dict(alpha=0),
             verticalalignment='center'
         )
-
-    # Prepare legend labels with abbreviations
+    
+    # LEGEND BOX----------------------------------------------------------------------------
+    palette_without_others=palette.pop('Others',palette)
+    
     if node_abbreviations:
-        legend_entries = {
-            node: f"{node} ({node_abbreviations.get(node, node)})" for node in H.nodes
-        }
+        legend_entries = {node: f"{node} ({node_abbreviations.get(node, node)})" for node in H.nodes}
     else:
         legend_entries = {node: node for node in H.nodes}
+        
+    # Handles and labels for the legend
+    handles = [plt.Line2D([0], [0], marker='o', color=palette_without_others[node], linestyle='', markersize=10) for node in legend_entries.keys()]
+    labels = list(legend_entries.values())
 
-    # Create patches for the legend and add them to the legend subplot
-    legend_handles = [
-        mpatches.Patch(color=color_map[node], label=legend_entries[node]) for node in H.nodes
-    ]
-    ax_legend.legend(handles=legend_handles, title="Nodes", loc='upper left')
-    ax_legend.axis("off")  
-
-    # Set title and other configurations for the network subplot
-    ax_network.set_title(title, fontsize=16)
-    ax_network.axis("off")  
+    # Add the legend to the plot
+    plt.legend(
+        handles,
+        labels,
+        bbox_to_anchor=(0.8, 0.4),  # Position the legend (x,y)
+        title="Categories",
+        fontsize=10,        
+        title_fontsize=12  
+    )
+    
+    #add_legend_category(fig, palette_category_dict.pop('Others',palette_category_dict), None, bbox_to_anchor=(1, 0.4))
+    
+    # PLOT figure----------------------------------------------------------------------------
+    plt.title(title, fontsize=23, color='#3b3b3b')
+    plt.axis("off")
     plt.tight_layout()
     plt.show()
+
+
+
 
 
 
