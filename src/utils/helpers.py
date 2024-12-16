@@ -68,6 +68,51 @@ def create_treemap_data(df):
 
     return labels, parents, values, ids
 
+def assign_world_region_categories(df_categories, world_region_categories):
+    """
+    Processes a DataFrame to standardize and categorize subject categories, 
+    specifically handling those related to 'World Regions'.
+
+    Steps:
+    1. Strips the prefix 'subject.' from values in the 'category' column if it exists.
+    2. Replaces categories containing any string from `world_region_categories` with 'World Regions'.
+    3. Updates rows where 'category' is 'World Regions':
+       - Sets 'level_1' to 'World Regions'.
+       - Sets 'level_2' and 'level_3' to None.
+
+    Parameters:
+    ----------
+    df_categories : pandas.DataFrame
+        A DataFrame containing a 'category' column and hierarchical columns 
+        ('level_1', 'level_2', 'level_3') to represent category levels.
+
+    Returns:
+    -------
+    pandas.DataFrame
+        The updated DataFrame with processed categories and hierarchy levels.
+    """
+    df_categories_filtered = df_categories.copy()
+
+    df_categories_filtered['category'] = df_categories_filtered['category'].apply(
+        lambda category: category.split('subject.', 1)[-1] if 'subject.' in category else category
+    )
+    df_categories_filtered['category'] = [
+        'World Regions' if any(region in category for region in world_region_categories) else category
+        for category in df_categories_filtered['category']
+    ]
+    # Updating level_1, level_2, and level_3 based on 'World Region' in 'category'
+    df_categories_filtered.loc[df_categories_filtered['category'] == 'World Regions', ['level_2', 'level_1']] = df_categories_filtered.loc[
+        df_categories_filtered['category'] == 'World Regions'
+    ].apply(
+        lambda row: (
+            'Countries' if row['level_1'] == 'Countries' else row['level_2'],
+            'World Regions'  # level_1 is always 'World Regions'
+        ),
+        axis=1
+    ).to_list()
+
+    return df_categories_filtered
+
 def voyages_categories(df_categories_filtered, voyage_categories):
     """
     Processes a DataFrame to standardize and categorize subject categories, 
@@ -101,7 +146,6 @@ def voyages_categories(df_categories_filtered, voyage_categories):
     # Updating level_1, level_2, and level_3 based on 'Voyages' in 'category'
     df_categories_filtered.loc[df_categories_filtered['category'] == 'Voyages', ['level_1', 'level_2', 'level_3']] = ['Voyages', None, None]
     return df_categories_filtered
-
 
 def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_level=True, finished=True):
     """
@@ -162,6 +206,7 @@ def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_lev
     
     return df_common_paths
     
+
 def analyze_categories_paths(df_paths, df_categories, users=True, omit_loops=False):
     """
     Analyze and summarize common category paths from article paths.
@@ -741,54 +786,7 @@ def plot_normalized_position_bar(df_position, title="Normalized Category Frequen
     # Show the interactive plot
     fig.show()
     
-# def check_voyage_status(paths, finished, n, voyage_categories = ['Geography', 'Countries']):
-#     """
-#     Check if the category path is voyage or not voyage, that is whether the first n categories after the first are 'Geography' or 'Countries'. 
 
-#     Parameters:
-#         paths (str): A category path in the form 'Geography -> Countries -> Geography'.
-#         finished (bool): Whether the path is finished or not finished.
-#         n (int): Number of different categories following the first to consider.
-
-#     Returns:
-#         bool: True if the path is a 'voyage', False otherwise.
-#     """    
-#     # Ensure that paths is a string
-#     if not isinstance(paths, str):
-#         return False  # Return False for invalid paths
-
-#     # Split the category path
-#     categories = paths.split(' -> ')
-#     path_len = len(categories)
-    
-#     # Exclude paths that start with categories on voyage_categories
-#     if categories[0] in voyage_categories or categories[-1] in voyage_categories:
-#         return False
-    
-#     if finished: 
-#         # Case 1: Path with 1 category -> always False
-#         if path_len <= 2:
-#             return False
-#         # Case 2: Path length between 3 and n+2 -> check middle categories
-#         elif 2 < path_len <= n + 2:
-#             return any(category in categories[1:-1] for category in voyage_categories)
-#         # Case 3: Path longer than n+2 -> check the first n categories after the first
-#         else:
-#             return any(category in categories[1:n+1] for category in voyage_categories)
-        
-#     else: 
-#         # Case 1: Path with 1 or 2 categories -> always False
-#         if path_len <= 1:
-#             return False
-#         # Case 2: Path length between 3 and n+2 -> check middle categories
-#         elif 1 < path_len <= n + 1:
-#             return any(category in categories[1:] for category in voyage_categories)
-#         # Case 3: Path longer than n+2 -> check the first n categories after the first
-#         else:
-#             return any(category in categories[1:n+1] for category in voyage_categories)
-    
-
-        
 def check_voyage_status(row):
     """
     Check if the path is a Wikispeedia_Voyage, that is whether categories (not source and target) are 'Voyages'. 
@@ -800,9 +798,9 @@ def check_voyage_status(row):
         bool: True if the path is a Wikispeedia_Voyage, False otherwise.
     """    
     
-    if row['target_maincategory']=='Voyages' or row['source_maincategory']=='Voyages':
+    if row['target_maincategory']=='World Regions' or row['source_maincategory']=='World Regions':
         return False
-    else: return any('Voyages' in category for category in row['Category Path'])
+    else: return any('World Regions' in category for category in row['Category Path'])
 
 def game_voyage_sorting(df_article_paths, df_categories):
     """
@@ -817,10 +815,16 @@ def game_voyage_sorting(df_article_paths, df_categories):
         DataFrame: Original DataFrame with a additional columns.
     """
     # Map articles to their main categories
+    # omit_loops=True thus showing only the transition within categories
     category_path_df = get_main_categories_paths(df_article_paths, df_categories, omit_loops=True, one_level=True)
+
+    # Get the full category path for each article path
+    # omit_loops=False thus showing the full category path
+    category_path_df_loops = get_main_categories_paths(df_article_paths, df_categories, omit_loops=False, one_level=True)
     
     # Apply the transformation and check voyage status
-    df_article_paths['Category Path'] = category_path_df['Category Path']
+    df_article_paths['Transition Category Path'] = category_path_df['Category Path']
+    df_article_paths['Category Path'] = category_path_df_loops['Category Path']
     df_article_paths['source_maincategory'] = category_path_df['source_maincategory']
     df_article_paths['target_maincategory'] = category_path_df['target_maincategory']
     df_article_paths['Wikispeedia_Voyage'] = df_article_paths.apply(lambda row: check_voyage_status(row), axis=1)
@@ -828,12 +832,12 @@ def game_voyage_sorting(df_article_paths, df_categories):
     return df_article_paths
 
 
-def plot_sankey_voyage(df_all_voyage):
+def plot_sankey_voyage(df):
     """
     Plots a Sankey diagram to visualize the distribution of paths classified as 'Voyage' or 'Non-Voyage'.
 
     Parameters:
-        df_all_voyage (DataFrame): DataFrame containing boolean 'Wiki_Voyage' and 'source_maincategory', 'target_maincategory'  columns
+        df (DataFrame): DataFrame containing boolean 'Wiki_Voyage' and 'source_maincategory', 'target_maincategory'  columns
 
     Returns:
         None: it displays the Sankey diagram 
@@ -841,10 +845,12 @@ def plot_sankey_voyage(df_all_voyage):
 
     #voyage_categories = ['Geography of Great Britain', 'Geography of Asia', 'Geography of Oceania Australasia', 'North American Geography', 'European Geography', 'African Geography', 'Central and South American Geography', 'Antarctica', 'Geography of the Middle East','Countries']
     
+    df_all_voyage = df.copy()
+
     # Mapping for start, voyage, and end nodes
-    df_all_voyage['source_category_label'] = df_all_voyage['source_maincategory'].apply(lambda x: 'Source is a World Region' if x=='Voyages' else 'Source is not a World Region')
-    df_all_voyage['target_category_label'] = df_all_voyage['target_maincategory'].apply(lambda x: 'Target is a World Region' if x=='Voyages' else 'Target is not a World Region')
-    df_all_voyage['voyage_label'] = df_all_voyage['Wikispeedia_Voyage'].apply(lambda x: 'Voyages' if x else 'Non Voyages')
+    df_all_voyage['source_category_label'] = df_all_voyage['source_maincategory'].apply(lambda x: 'Source is a World Regions' if x=='World Regions' else 'Source is not a World Regions')
+    df_all_voyage['target_category_label'] = df_all_voyage['target_maincategory'].apply(lambda x: 'Target is a World Regions' if x=='World Regions' else 'Target is not a World Regions')
+    df_all_voyage['voyage_label'] = df_all_voyage['Wikispeedia_Voyage'].apply(lambda x: 'Voyages' if x else 'Non-Voyages')
 
     # Start→Voyage flows
     start_voyage_flows = df_all_voyage.groupby(['source_category_label', 'voyage_label']).size().reset_index(name='count')
@@ -853,9 +859,9 @@ def plot_sankey_voyage(df_all_voyage):
     voyage_end_flows = df_all_voyage.groupby(['voyage_label', 'target_category_label']).size().reset_index(name='count')
 
     # Define node labels
-    labels = ['Source is a World Region', 'Source is not a World Region',
-              'Voyages', 'Non Voyages',
-              'Target is a World Region', 'Target is not a World Region']
+    labels = ['Source is a World Regions', 'Source is not a World Regions',
+              'Voyages', 'Non-Voyages',
+              'Target is a World Regions', 'Target is not a World Regions']
 
     # Create mappings for source and target node indices
     label_map = {label: i for i, label in enumerate(labels)}
@@ -898,7 +904,7 @@ def plot_sankey_voyage(df_all_voyage):
     # Create the Sankey diagram
     fig = go.Figure(data=[go.Sankey(
         node=dict(pad=15, thickness=20, line=dict(color="black", width=0), label=labels, color=node_colors),
-        link=dict(source=sources, target=targets, value=values, hovercolor=link_colors)
+        link=dict(source=sources, target=targets, value=values, color= 'rgba(60,60,60,0.3)', hovercolor=link_colors)
     )])
     
     fig.update_layout(
@@ -911,7 +917,8 @@ def plot_sankey_voyage(df_all_voyage):
     )
     
     fig.show()
-    return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
+    return fig
+    #return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
 
 def backtrack(paths) :
     """
@@ -1379,6 +1386,7 @@ def plot_proportion_category_start_stop_pies(df_article, palette, abbreviations=
         labels=start_labels,
         colors=[palette.get(cat, "#cccccc") for cat in start_dict.index],
         autopct='%1.1f%%',
+        #textprops={'color':"w"}
         startangle=90,
         pctdistance=0.8
     )
@@ -1399,14 +1407,224 @@ def plot_proportion_category_start_stop_pies(df_article, palette, abbreviations=
         fig=fig,
         palette_category=palette,
         categories=palette.keys(),
-        bbox_to_anchor=(1.15, 0.85)
+        bbox_to_anchor=(1.15, 0.7)
     )
     plt.suptitle("Proportions of Categories in Start and Target Articles", fontsize=16, y=1.05)
     plt.tight_layout()
 
     plt.show()
 
+def plot_metrics_by_category(df_article, metrics, palette_category_dict, category_abbreviations):
+    """
+    Plots bar charts for multiple metrics by category using Plotly.
 
+    Parameters:
+    - df_article (DataFrame): DataFrame containing article data.
+    - metrics (list): List of metric column names to plot.
+    - palette_category_dict (dict): Color palette for the categories.
+    - category_abbreviations (dict): Abbreviations for categories.
+    """
+    # Loop through metrics and plot
+    fig, ax = plt.subplots(2, 3, figsize=(15, 5))
+    
+    for i, metric in enumerate(metrics):
+        row, col = divmod(i, 3)
+        order = df_article.groupby("category")[metric].mean().sort_values(ascending=False).reset_index()["category"]
+        sn.barplot(
+            x="category", 
+            y=metric, 
+            hue="category", 
+            palette=palette_category_dict, 
+            data=df_article, 
+            ax=ax[row, col], 
+            order=order
+        )
+        ax[row, col].set_title(f'{metric.replace("_", " ").capitalize()} by Category')
+        ax[row, col].set_xticklabels([])
+        if row == 0 :
+            ax[row, col].set_xlabel('')
+
+    add_legend_category(fig,palette_category_dict, category_abbreviations)
+
+    plt.suptitle("Articles Complexity by Categories", y=1, fontsize=16)
+    plt.tight_layout()
+    plt.show()
+
+def plot_article_popularity_link_density(df_article, df_finished_voyage, palette_category_dict, category_abbreviations, df_categories_filtered):
+    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+
+    #Plot the most visited articles in finished paths
+    all_articles = []
+    df_finished_voyage['path'].apply(lambda x: all_articles.extend(x.split(';')))
+    df_path_articles = pd.Series(all_articles).value_counts().rename_axis('article_name').reset_index(name='value_counts')
+    df_path_articles["category"]=df_path_articles["article_name"].apply(lambda x: df_categories_filtered[df_categories_filtered["article"]==x]["level_1"].values[0] if len(df_categories_filtered[df_categories_filtered["article"]==x]["category"].values)>0 else "None")
+    df_path_articles = df_path_articles[df_path_articles['article_name'] != '<']
+
+    sn.barplot(x='value_counts', y='article_name', hue="category", palette=palette_category_dict, data=df_path_articles.head(15), ax=ax[0])
+    ax[0].set_title('Most visited articles in paths')
+    ax[0].legend_.remove() 
+
+    for i, metric in enumerate(["in_degree", "out_degree"]):
+        sn.barplot(x=metric, y='article', hue="category", palette=palette_category_dict, data=df_article.sort_values(metric, ascending=False).head(15), ax=ax[i+1])
+        ax[i+1].set_title(f'Articles with the most links ({metric.replace("_", " ").capitalize()}) (without duplicates)')
+        ax[i+1].legend_.remove()
+        ax[i+1].set_ylabel('')
+
+    add_legend_category(fig,palette_category_dict, category_abbreviations)
+    plt.suptitle("Correlation between article popularity and link density", y=1, fontsize=16)
+    plt.tight_layout()
+    plt.show()
+
+
+def remove_outliers(df, col):
+    Q1 = df[col].quantile(0.25)
+    Q3 = df[col].quantile(0.75)
+    IQR = Q3 - Q1
+    filtered_df = df[(df[col] >= (Q1 - 1.5 * IQR)) & (df[col] <= (Q3 + 1.5 * IQR))]
+    return filtered_df
+
+
+def plot_difficulties_voyage (df_finished_voyage, df_unfinished_voyage, palette_category_dict):
+    color_voyage = palette_category_dict['World Regions']
+    
+    df_finished_voyage["finished"] = True
+    df_finished_voyage["cte"] = 1
+    df_unfinished_voyage["finished"] = False
+    df_unfinished_voyage["cte"] = 1
+    df_voyage = pd.concat([df_finished_voyage, df_unfinished_voyage])
+
+    fig = make_subplots(
+        rows=2, cols=2, 
+        subplot_titles=(
+            "Duration Distribution", 
+            "Completion Ratios", 
+            "Rating Distribution for Voyage Game", 
+            "Rating Distribution for Non-Voyage Game"
+        )
+    )
+
+    # ==== PLOT 1 (Violin Plot: Duration Distribution) ====
+    df_voyage_duration = df_finished_voyage[df_finished_voyage["Wikispeedia_Voyage"] == True]
+    df_voyage_duration = remove_outliers(df_voyage_duration, "durationInSec")
+
+    df_non_voyage_duration = df_finished_voyage[df_finished_voyage["Wikispeedia_Voyage"] == False]
+    df_non_voyage_duration = remove_outliers(df_non_voyage_duration, "durationInSec")
+
+    fig.add_trace(
+        go.Violin(
+            x=df_voyage_duration["cte"], 
+            y=df_voyage_duration["durationInSec"],
+            legendgroup="Yes", 
+            scalegroup="Yes", 
+            name="Voyage",
+            side="negative", 
+            line_color=color_voyage, 
+            box_visible=True,
+            meanline_visible=True,
+            showlegend=False),
+        row=1, col=1
+    )
+    fig.add_trace(
+        go.Violin(
+            x=df_non_voyage_duration["cte"],
+            y=df_non_voyage_duration["durationInSec"],
+            legendgroup="No", 
+            scalegroup="No", 
+            name="Non-Voyage",
+            side="positive", 
+            line_color="gray",
+            box_visible=True,
+            meanline_visible=True,
+            showlegend=False
+        ),
+        row=1, col=1
+    )
+
+    # Axis labels
+    fig.update_yaxes(title_text="Duration (seconds)", row=1, col=1)
+
+    # ==== PLOT 2 (Bar Plot: Completion Ratios) ====
+    df_voyage_comparison = df_voyage.groupby(["finished", "Wikispeedia_Voyage"])[["Wikispeedia_Voyage"]].count() 
+    df_voyage_comparison.columns = ["count"]
+    df_voyage_comparison = df_voyage_comparison.reset_index()
+    df_voyage_comparison = df_voyage_comparison.sort_values(by="finished", ascending=False)
+    df_voyage_comparison["percentage"] = df_voyage_comparison.groupby("Wikispeedia_Voyage")["count"].transform(lambda x: (x / x.sum()) * 100).round(1)
+    df_voyage_comparison["voyage_label"] = df_voyage_comparison["Wikispeedia_Voyage"].map({False: "Non-Voyage", True: "Voyage"})
+    df_voyage_comparison["finished_label"] = df_voyage_comparison["finished"].map({False: "Unfinished", True: "Finished"})
+
+    for voyage_label, color in [("Voyage", color_voyage), ("Non-Voyage", 'gray')]:
+        filtered_data = df_voyage_comparison[df_voyage_comparison["voyage_label"] == voyage_label]
+        fig.add_trace(
+            go.Bar(
+                x=filtered_data["finished_label"],
+                y=filtered_data["count"],
+                text=filtered_data["percentage"],
+                name=voyage_label,
+                marker_color=color,
+                texttemplate="%{text}%",
+            ),
+            row=1, col=2
+        )
+        
+    # Axis labels
+    fig.update_yaxes(title_text="Count", row=1, col=2)
+    fig.update_xaxes(title_text="Path Type", row=1, col=2)    
+        
+    # ==== PLOT 3 (Bar Plot: Rating Distribution for Voyage Games) ====
+    df_voyage_rating = df_finished_voyage[df_finished_voyage["Wikispeedia_Voyage"] == True].copy()
+    df_voyage_rating["rating"] = df_voyage_rating["rating"].fillna('NaN').astype(str)
+    df_voyage_rating = df_voyage_rating.groupby("rating")["rating"].count().reset_index(name="count")
+    df_voyage_rating["count"] = df_voyage_rating["count"] / df_voyage_rating["count"].sum() * 100
+    
+    fig.add_trace(
+        go.Bar(
+            x=df_voyage_rating["rating"], 
+            y=df_voyage_rating["count"], 
+            marker_color=color_voyage, 
+            name="Voyage",
+            showlegend=False
+        ),
+        row=2, col=1
+    )
+
+    # axis labels
+    fig.update_yaxes(title_text="Pourcentage", row=2, col=1)
+    fig.update_xaxes(title_text="Rating", row=2, col=1)
+
+    # ==== PLOT 4 (Bar Plot: Rating Distribution for Non-Voyage Games) ====
+    df_non_voyage_rating = df_finished_voyage[df_finished_voyage["Wikispeedia_Voyage"] == False].copy()
+    df_non_voyage_rating["rating"] = df_non_voyage_rating["rating"].fillna('NaN').astype(str)
+    df_non_voyage_rating = df_non_voyage_rating.groupby("rating")["rating"].count().reset_index(name="count")
+    df_non_voyage_rating["count"] = df_non_voyage_rating["count"] / df_non_voyage_rating["count"].sum() * 100
+
+    fig.add_trace(
+        go.Bar(
+            x=df_non_voyage_rating["rating"], 
+            y=df_non_voyage_rating["count"], 
+            marker_color="gray", 
+            name="Non-Voyage",
+            showlegend=False
+        ),
+        row=2, col=2
+    )
+
+    # axis labels
+    fig.update_yaxes(title_text="Pourcentage", row=2, col=2)
+    fig.update_xaxes(title_text="Rating", row=2, col=2)
+
+    # ==== Final Layout Update ====
+    fig.update_layout(
+        height=1000, width=1000,  # Adjust size of the overall figure
+        title="Summary of Voyage and Non-Voyage Game Metrics",
+        showlegend=True,
+        legend_title="Legend",
+        xaxis_title="Game Type",
+        yaxis_title="Count/Percentage",
+        violingap=0.4, 
+        violinmode="overlay"
+    )
+
+    fig.show()
 
     
 def plot_shortest_paths_matrix(df_shortest_path):
@@ -1517,3 +1735,46 @@ def compute_proba_path(path, cat_to_cat_proba_df):
     for i in range(min(len(path)-1, 1)):
         proba_path *= cat_to_cat_proba_df[path[i]][path[i+1]]
     return proba_path #** (1 / (len(path)))
+
+def location_click_on_page(df_finished, parser):
+    df_finished['position'] = np.NaN
+
+    for i in range(len(df_finished)):
+        articles = df_finished['path'][i].split(';')
+        
+        position = []
+        for a in range(len(articles)-1):
+            if articles[a+1] == '<' or articles[a] == '<':
+                continue
+            else:
+                info = parser.find_link_positions(articles[a], articles[a+1])
+                position.append(info['article_link_position'][0]/info['total_links'] if len(info['article_link_position']) != 0 else np.NaN)
+        df_finished.loc[i, 'position'] = np.mean(position)
+    return df_finished
+
+from tqdm import tqdm
+
+def find_category_position_articles(parser, df_categories, categories_others) :
+
+    def mean_link_position_per_category(parser, df_categories, category= "Country") : 
+        
+        #parser.parse_all()
+        articles_links = {article: data["total_links"] for article, data in parser.parsed_articles.items()}
+        article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
+        articles_links_voyage = {k: [v_select for v_select in v if v_select in article_to_category.keys() and article_to_category[v_select] == category] for k, v in articles_links.items()}
+        position_voyage = []
+        for article, voyage_list in tqdm(articles_links_voyage.items()):
+            position = []
+            # if category not in list(df_categories[df_categories['article'] == article]["level_1"]) :
+            for a in voyage_list:
+                info = parser.find_link_positions(article, a)
+                position.append(info['article_link_position'][0]/info['total_links'] if len(info['article_link_position']) != 0 else np.NaN)
+            position_voyage.append(np.mean(position))
+            # else :
+            #     position_voyage.append(np.NaN)
+        return position_voyage
+    link_per_cat = {}
+
+    for category in categories_others:
+        link_per_cat[category] = mean_link_position_per_category(parser, df_categories, category=category)
+    return link_per_cat
