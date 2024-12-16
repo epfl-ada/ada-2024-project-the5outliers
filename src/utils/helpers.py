@@ -1386,6 +1386,7 @@ def plot_proportion_category_start_stop_pies(df_article, palette, abbreviations=
         labels=start_labels,
         colors=[palette.get(cat, "#cccccc") for cat in start_dict.index],
         autopct='%1.1f%%',
+        #textprops={'color':"w"}
         startangle=90,
         pctdistance=0.8
     )
@@ -1406,7 +1407,7 @@ def plot_proportion_category_start_stop_pies(df_article, palette, abbreviations=
         fig=fig,
         palette_category=palette,
         categories=palette.keys(),
-        bbox_to_anchor=(1.15, 0.85)
+        bbox_to_anchor=(1.15, 0.7)
     )
     plt.suptitle("Proportions of Categories in Start and Target Articles", fontsize=16, y=1.05)
     plt.tight_layout()
