@@ -4,70 +4,85 @@ from urllib.parse import unquote
 
 from src.utils.helpers import filter_most_specific_category
 
-
 def read_all():
-    '''The function that reads all the data and adds interesting features.'''
+    '''
+    Reads all the required data, processes it, and adds interesting features to various dataframes.
+
+    Returns:
+        Tuple: A collection of processed dataframes including article names, HTML stats, categories, links, 
+               shortest path lengths, unfinished paths, finished paths, semantic similarity, 
+               category similarity matrices, and the processed article dataframe.
+    '''
     
     from src.utils.HTMLParser import HTMLParser
 
+    # Initialize HTML parser and load preprocessed data
     parser = HTMLParser()
     parser.load_pickle()
-    df_article_names = read_articles() 
+
+    # Read all necessary input dataframes
+    df_article_names = read_articles()
     df_html_stats = parser.get_df_html_stats()
     df_categories = read_categories()
     df_links = read_links()
-    df_shortest_path = read_shortest_path_matrix()
+    df_shortest_path_length = read_shortest_path_matrix()
     df_unfinished = read_unfinished_paths()
-    df_finished = read_finished_paths() 
-    df_sm = read_similartiy_matrix() 
+    df_finished = read_finished_paths()
+    df_sm = read_similartiy_matrix()
     df_scat = read_categories_matrix()
 
+    # ---- Articles Metrics ----
     df_article = pd.DataFrame(df_article_names).copy()
-    print("df_article_names length:", len(df_article_names))
-    print("df_links length (unique linkTarget):", len(df_links['linkTarget'].unique()))
-    print("df_links length (unique linkSource):", len(df_links['linkSource'].unique()))
-    print("df_html_stats length:", len(df_html_stats))
-    print("df_categories length:", len(df_categories))
 
+    ## Add Links metrics to the articles
     # Compute in-degree (number of times each article is a target link)
     in_degree = df_links.groupby('linkTarget').size().reset_index(name="in_degree")
-    # Compute out-degree (link density: number of times each article is a source link)
+    # Compute out-degree (number of times each article is a source link)
     out_degree = df_links.groupby('linkSource').size().reset_index(name="out_degree")
-
-    # Merge in-degree and out-degree with df_article_names
+    # Merge in-degree and out-degree with the article dataframe
     df_article = df_article.merge(in_degree, left_on='article', right_on='linkTarget', how='left')
-    print("After merging in_degree:", len(df_article))
     df_article = df_article.merge(out_degree, left_on='article', right_on='linkSource', how='left')
-    print("After merging out_degree:", len(df_article))
     df_article = df_article.drop(columns=['linkTarget', 'linkSource'])
-    print("After dropping columns:", len(df_article))
     # Fill NaN values with 0, assuming no links imply zero counts for those articles
     df_article = df_article.fillna(0).astype({'in_degree': 'int', 'out_degree': 'int'})
 
-    # add the html stats to the articles
+    ## Add HTML statistics to the articles
     df_html_stats = df_html_stats.rename(columns={'article_name': 'article'})
-    df_article = pd.merge(df_article, df_html_stats, how='left')
-    print("After merging df_html_stats:", len(df_article))
+    df_article = df_article.merge(df_html_stats, how='left', on='article')
+
+    ## Add Categories to the articles
     # Attributing the main category to articles with multiple categories based on the category with fewer total articles
     df_categories = filter_most_specific_category(df_categories)
-    # add the category (level_1) to each articles
+    # Map the main category (level_1) to each article
     category_map = dict(zip(df_categories["article"], df_categories["level_1"]))
     df_article["category"] = df_article["article"].map(category_map)
-    print("After merging df_categories:", len(df_article))
-    # let's add some useful metrics to each paths dataframe: shortest path, semantic similarity
+
+    # ---- Users Path Metrics ----
+    # Process unfinished paths
     df_unfinished['cosine_similarity'] = df_unfinished.apply(lambda x: find_shortest_distance(x, df_sm), axis=1)
-    df_unfinished['shortest_path'] = df_unfinished.apply(lambda x: find_shortest_distance(x, df_shortest_path), axis=1)
+    df_unfinished['shortest_path'] = df_unfinished.apply(lambda x: find_shortest_distance(x, df_shortest_path_length), axis=1)
     df_unfinished['path_length'] = df_unfinished['path'].apply(lambda x: x.count(';') + 1)
     df_unfinished['back_clicks'] = df_unfinished['path'].apply(lambda x: x.count('<'))
     df_unfinished['categories_similarity'] = df_unfinished.apply(lambda x: find_shortest_distance(x, df_scat), axis=1)
-
+    # Process finished paths
     df_finished['cosine_similarity'] = df_finished.apply(lambda x: find_shortest_distance(x, df_sm), axis=1)
-    df_finished['shortest_path'] = df_finished.apply(lambda x: find_shortest_distance(x, df_shortest_path), axis=1)
+    df_finished['shortest_path'] = df_finished.apply(lambda x: find_shortest_distance(x, df_shortest_path_length), axis=1)
     df_finished['path_length'] = df_finished['path'].apply(lambda x: x.count(';') + 1)
     df_finished['back_clicks'] = df_finished['path'].apply(lambda x: x.count('<'))
     df_finished['categories_similarity'] = df_finished.apply(lambda x: find_shortest_distance(x, df_scat), axis=1)
 
-    return df_article_names, df_html_stats, df_categories, df_links, df_shortest_path, df_unfinished, df_finished, df_sm, df_scat, df_article
+    return (
+        df_article_names, 
+        df_html_stats, 
+        df_categories, 
+        df_links, 
+        df_shortest_path_length, 
+        df_unfinished, 
+        df_finished, 
+        df_sm, 
+        df_scat, 
+        df_article
+    )
 
 def get_bad_articles():
     '''
