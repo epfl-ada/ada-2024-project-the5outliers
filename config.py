@@ -11,7 +11,7 @@ CATEGORY_ABBREVIATIONS = {
     'Religion': 'R',
     'Language and literature': 'L&L',
     'Citizenship': 'CIT',
-    'World Region': 'WR',
+    'World Regions': 'WR',
     'Design and Technology': 'D&T',
     'Everyday life': 'Life',
     'History': 'Hist',
@@ -25,7 +25,7 @@ CATEGORIES_OTHERS = [
     'Art',
     'Business Studies',
     'Citizenship',
-    'Voyages',
+    'World Regions',
     'Design and Technology',
     'Everyday life',
     'Geography',
@@ -42,7 +42,7 @@ CATEGORIES_OTHERS = [
 
 # Highlight colors for specific categories
 HIGHLIGHT_COLORS = {
-    'World Region': '#2CB5AE'
+    'World Regions': '#2CB5AE'
 }
 
 # Generate shades of grey for remaining categories
