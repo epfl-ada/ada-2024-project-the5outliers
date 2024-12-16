@@ -71,13 +71,13 @@ def create_treemap_data(df):
 def assign_world_region_categories(df_categories, world_region_categories):
     """
     Processes a DataFrame to standardize and categorize subject categories, 
-    specifically handling those related to 'World Region'.
+    specifically handling those related to 'World Regions'.
 
     Steps:
     1. Strips the prefix 'subject.' from values in the 'category' column if it exists.
-    2. Replaces categories containing any string from `world_region_categories` with 'World Region'.
-    3. Updates rows where 'category' is 'World Region':
-       - Sets 'level_1' to 'World Region'.
+    2. Replaces categories containing any string from `world_region_categories` with 'World Regions'.
+    3. Updates rows where 'category' is 'World Regions':
+       - Sets 'level_1' to 'World Regions'.
        - Sets 'level_2' and 'level_3' to None.
 
     Parameters:
@@ -97,11 +97,20 @@ def assign_world_region_categories(df_categories, world_region_categories):
         lambda category: category.split('subject.', 1)[-1] if 'subject.' in category else category
     )
     df_categories_filtered['category'] = [
-        'World Region' if any(region in category for region in world_region_categories) else category
+        'World Regions' if any(region in category for region in world_region_categories) else category
         for category in df_categories_filtered['category']
     ]
     # Updating level_1, level_2, and level_3 based on 'World Region' in 'category'
-    df_categories_filtered.loc[df_categories_filtered['category'] == 'World Region', ['level_1', 'level_2', 'level_3']] = ['World Region', None, None]
+    df_categories_filtered.loc[df_categories_filtered['category'] == 'World Regions', ['level_2', 'level_1']] = df_categories_filtered.loc[
+        df_categories_filtered['category'] == 'World Regions'
+    ].apply(
+        lambda row: (
+            'Countries' if row['level_1'] == 'Countries' else row['level_2'],
+            'World Regions'  # level_1 is always 'World Regions'
+        ),
+        axis=1
+    ).to_list()
+
     return df_categories_filtered
 
 def voyages_categories(df_categories_filtered, voyage_categories):
@@ -777,52 +786,6 @@ def plot_normalized_position_bar(df_position, title="Normalized Category Frequen
     # Show the interactive plot
     fig.show()
     
-# def check_voyage_status(paths, finished, n, voyage_categories = ['Geography', 'Countries']):
-#     """
-#     Check if the category path is voyage or not voyage, that is whether the first n categories after the first are 'Geography' or 'Countries'. 
-
-#     Parameters:
-#         paths (str): A category path in the form 'Geography -> Countries -> Geography'.
-#         finished (bool): Whether the path is finished or not finished.
-#         n (int): Number of different categories following the first to consider.
-
-#     Returns:
-#         bool: True if the path is a 'voyage', False otherwise.
-#     """    
-#     # Ensure that paths is a string
-#     if not isinstance(paths, str):
-#         return False  # Return False for invalid paths
-
-#     # Split the category path
-#     categories = paths.split(' -> ')
-#     path_len = len(categories)
-    
-#     # Exclude paths that start with categories on voyage_categories
-#     if categories[0] in voyage_categories or categories[-1] in voyage_categories:
-#         return False
-    
-#     if finished: 
-#         # Case 1: Path with 1 category -> always False
-#         if path_len <= 2:
-#             return False
-#         # Case 2: Path length between 3 and n+2 -> check middle categories
-#         elif 2 < path_len <= n + 2:
-#             return any(category in categories[1:-1] for category in voyage_categories)
-#         # Case 3: Path longer than n+2 -> check the first n categories after the first
-#         else:
-#             return any(category in categories[1:n+1] for category in voyage_categories)
-        
-#     else: 
-#         # Case 1: Path with 1 or 2 categories -> always False
-#         if path_len <= 1:
-#             return False
-#         # Case 2: Path length between 3 and n+2 -> check middle categories
-#         elif 1 < path_len <= n + 1:
-#             return any(category in categories[1:] for category in voyage_categories)
-#         # Case 3: Path longer than n+2 -> check the first n categories after the first
-#         else:
-#             return any(category in categories[1:n+1] for category in voyage_categories)
-    
 
 def check_voyage_status(row):
     """
@@ -835,9 +798,9 @@ def check_voyage_status(row):
         bool: True if the path is a Wikispeedia_Voyage, False otherwise.
     """    
     
-    if row['target_maincategory']=='World Region' or row['source_maincategory']=='World Region':
+    if row['target_maincategory']=='World Regions' or row['source_maincategory']=='World Regions':
         return False
-    else: return any('World Region' in category for category in row['Category Path'])
+    else: return any('World Regions' in category for category in row['Category Path'])
 
 def game_voyage_sorting(df_article_paths, df_categories):
     """
@@ -885,8 +848,8 @@ def plot_sankey_voyage(df):
     df_all_voyage = df.copy()
 
     # Mapping for start, voyage, and end nodes
-    df_all_voyage['source_category_label'] = df_all_voyage['source_maincategory'].apply(lambda x: 'Source is a World Region' if x=='World Region' else 'Source is not a World Region')
-    df_all_voyage['target_category_label'] = df_all_voyage['target_maincategory'].apply(lambda x: 'Target is a World Region' if x=='World Region' else 'Target is not a World Region')
+    df_all_voyage['source_category_label'] = df_all_voyage['source_maincategory'].apply(lambda x: 'Source is a World Regions' if x=='World Regions' else 'Source is not a World Regions')
+    df_all_voyage['target_category_label'] = df_all_voyage['target_maincategory'].apply(lambda x: 'Target is a World Regions' if x=='World Regions' else 'Target is not a World Regions')
     df_all_voyage['voyage_label'] = df_all_voyage['Wikispeedia_Voyage'].apply(lambda x: 'Voyages' if x else 'Non-Voyages')
 
     # Start→Voyage flows
@@ -896,9 +859,9 @@ def plot_sankey_voyage(df):
     voyage_end_flows = df_all_voyage.groupby(['voyage_label', 'target_category_label']).size().reset_index(name='count')
 
     # Define node labels
-    labels = ['Source is a World Region', 'Source is not a World Region',
+    labels = ['Source is a World Regions', 'Source is not a World Regions',
               'Voyages', 'Non-Voyages',
-              'Target is a World Region', 'Target is not a World Region']
+              'Target is a World Regions', 'Target is not a World Regions']
 
     # Create mappings for source and target node indices
     label_map = {label: i for i, label in enumerate(labels)}
@@ -1521,7 +1484,7 @@ def remove_outliers(df, col):
 
 
 def plot_difficulties_voyage (df_finished_voyage, df_unfinished_voyage, palette_category_dict):
-    color_voyage = palette_category_dict['World Region']
+    color_voyage = palette_category_dict['World Regions']
     
     df_finished_voyage["finished"] = True
     df_finished_voyage["cte"] = 1
