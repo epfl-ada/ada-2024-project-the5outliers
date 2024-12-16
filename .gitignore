@@ -6,7 +6,7 @@ data/paths-and-graph/*
 !data/paths-and-graph/similarity_matrix.npy
 !data/paths-and-graph/category_jaccard_similarity.npy
 !data/paths-and-graph/parsed_html.pkl
-!data/paths-and-graph/optimal_paths.csv
+!data/paths-and-graph/optimal_paths.pkl
 
 # Cache
 *.bin
