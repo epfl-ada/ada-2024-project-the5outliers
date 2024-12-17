@@ -464,6 +464,56 @@ def map_path_to_categories(path, article_to_category):
         return [article_to_category.get(article, 'Unknown') for article in path]
     return None
 
+def clean_path_list(path):
+    """
+    Cleans a path list by removing occurrences of '<' and the preceding element.
+
+    Parameters:
+    - path: List of elements representing a path.
+
+    Returns:
+    - A cleaned list with '<' and its preceding elements removed.
+    """
+    while '<' in path:
+        idx = path.index('<')
+        del path[idx - 1:idx + 1]  # Remove the element before '<' and '<' itself
+    return path
+
+
+def users_paths(df_finished, df_unfinished, article_to_category):
+    """
+    Processes paths for finished and unfinished users by extracting sources, targets, and path categories.
+
+    Parameters:
+    - df_finished: DataFrame containing finished paths with a 'path_list' column.
+    - df_unfinished: DataFrame containing unfinished paths with a 'path' column (semicolon-separated strings).
+    - article_to_category: Dictionary mapping articles to categories.
+
+    Returns:
+    - Tuple of DataFrames (users_finished, users_unfinished), each containing processed paths and path categories.
+    """
+    # Process finished paths
+    df_finished['source'] = df_finished['path'].str.split(';').apply(lambda x: x[0])  # First element in path
+    df_finished['target'] = df_finished['path'].str.split(';').apply(lambda x: x[-1])  # Last element in path
+    users_finished = df_finished[['source', 'target', 'path']].copy()
+    users_finished['path'] = users_finished['path'].str.split(';')
+    users_finished['path'] = users_finished['path'].apply(clean_path_list)
+    users_finished['Category Path'] = users_finished['path'].apply(
+        lambda path: map_path_to_categories(path, article_to_category)
+    )
+
+    # Process unfinished paths
+    users_unfinished = df_unfinished[['target', 'path']].copy()
+    users_unfinished['path'] = users_unfinished['path'].str.split(';')
+    users_unfinished['path'] = users_unfinished['path'].apply(clean_path_list)
+    users_unfinished['source'] = users_unfinished['path'].str[0]
+    users_unfinished = users_unfinished[users_unfinished['path'].apply(lambda x: len(x) > 1)]
+    users_unfinished['Category Path'] = users_unfinished['path'].apply(
+        lambda path: map_path_to_categories(path, article_to_category)
+    )
+
+    return users_finished, users_unfinished
+
 def filter_pairs(optimal_paths, users_finished, users_unfinished):
     """
     Filters and aligns source-target pairs across optimal, finished, and unfinished datasets.
@@ -509,9 +559,9 @@ def calculate_group_step_percentages(group, unfinished):
     """
     paths = pd.DataFrame(group['Category Path'].tolist())
     if unfinished:
-        paths = paths.iloc[:, 1:]  # Exclude the source
+        paths = paths.iloc[:, :]  # Exclude the source
     else:
-        paths = paths.iloc[:, 1:-1]  # Exclude source and target
+        paths = paths.iloc[:, :-1]  # Exclude source and target
 
     step_percentages = [
         paths[step].value_counts(normalize=True).rename(f'step_{i+1}') * 100
@@ -542,7 +592,6 @@ def calculate_step_percentages(optimal_fin, users_finished, optimal_unf, users_u
     S_T_opt_unf_percentages = optimal_unf.groupby(['source', 'target']).apply(
         lambda g: calculate_group_step_percentages(g, unfinished=False)
     )
-    users_unfinished = users_unfinished[users_unfinished['path_length'] > 1]
     S_T_unf_percentages = users_unfinished.groupby(['source', 'target']).apply(
         lambda g: calculate_group_step_percentages(g, unfinished=True)
     )
@@ -561,6 +610,7 @@ def calculate_average_percentages(dataframes, column_names):
     """
     results = []
     for df, suffix in dataframes:
+        df = df.drop(columns='step_1')
         avg_df = df.mean(axis=1, skipna=True).reset_index()
         avg_df.columns = column_names[:3] + [f'percentage_{suffix}']
         results.append(avg_df)
@@ -595,7 +645,7 @@ def process_category_means(diff_df, article_to_category):
     """
     # Ensure all categories are present
     category_means = diff_df.groupby(['source', 'target', 'categories'])['percentage_diff'].mean().reset_index()
-    category_means = category_means.set_index(['source', 'target', 'categories']).unstack(fill_value=0).stack().reset_index()
+    category_means = category_means.set_index(['source', 'target', 'categories']).unstack(fill_value=0).stack(future_stack=True).reset_index()
 
     # Map source and target to their respective categories
     category_means['source_category'] = category_means['source'].map(article_to_category)
@@ -603,14 +653,156 @@ def process_category_means(diff_df, article_to_category):
     category_means['source_target'] = category_means['source_category'] + ' -> ' + category_means['target_category']
 
     # Group by source-target-category combination and calculate mean percentage_diff
-    category_means_norm = category_means.groupby(
+    category_means = category_means.groupby(
         ['source_category', 'target_category', 'source_target', 'categories']
     )['percentage_diff'].mean().reset_index()
 
     # Generate aggregated data for plotting
     category_means = pd.DataFrame(category_means.groupby('categories')['percentage_diff'].mean().reset_index())
-    category_means_norm = pd.DataFrame(category_means_norm.groupby('categories')['percentage_diff'].mean().reset_index())
-    return category_means, category_means_norm
+    return category_means
+
+def process_and_calculate_differences(dataframes, article_to_category, column_names=['source', 'target', 'categories']):
+    """
+    Combines the calculation of averages, merging of differences, and processing of category means 
+    into a single function.
+
+    Parameters:
+    - dataframes: List of tuples, each containing a DataFrame and its suffix for renaming.
+    - key_columns: List of column names to merge on.
+    - article_to_category: Mapping of articles to categories.
+    - column_names: List of column names for renaming.
+
+    Returns:
+    - category_fin_means, category_fin_means_norm, category_unf_means, category_unf_means_norm
+    """
+    key_columns = ['source', 'target', 'categories']
+
+    # Calculate averages
+    S_T_opt_fin_avg, S_T_fin_avg, S_T_opt_unf_avg, S_T_unf_avg = calculate_average_percentages(
+        dataframes, column_names
+    )
+
+    # Merge and calculate differences
+    S_T_diff_fin = merge_and_calculate_difference(S_T_opt_fin_avg, S_T_fin_avg, key_columns, ('percentage_fin', 'percentage_opt'))
+    S_T_diff_unf = merge_and_calculate_difference(S_T_opt_unf_avg, S_T_unf_avg, key_columns, ('percentage_unf', 'percentage_opt'))
+
+    # Process category means
+    category_fin_means = process_category_means(S_T_diff_fin, article_to_category)
+    category_unf_means = process_category_means(S_T_diff_unf, article_to_category)
+
+    return category_fin_means, category_unf_means
+
+def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_norm_steps, category_fin_means_norm, category_unf_means_norm, palette, title="Category Percentage Used at Each Step of Finished Paths"):
+    """
+    Plot an interactive line plot of category frequencies across positions with both normalized and non-normalized views.
+    Add bar plot as a subplot with inverted axes and hashed bars for 'unfinished'.
+    
+    Parameters:
+        S_T_fin_percentages_norm_steps (DataFrame): DataFrame with user data.
+        S_T_opt_fin_percentages_norm_steps (DataFrame): DataFrame with optimal data.
+        category_fin_means_norm (DataFrame): Finished category percentages.
+        category_unf_means_norm (DataFrame): Unfinished category percentages.
+        palette (dict): Color palette for categories.
+        title (str): Title of the plot.
+    """
+    # Extract and sort categories
+    categories = S_T_fin_percentages_norm_steps["categories"].unique()
+    
+    # Create subplots
+    fig = make_subplots(
+        rows=1, cols=3, 
+        subplot_titles=("Users' paths", "Optimal paths", "Percentage difference across all steps"),
+        horizontal_spacing=0.1
+    )
+    
+    # Add non-normalized line plot traces (Users)
+    for category in categories:
+        category_data = S_T_fin_percentages_norm_steps[S_T_fin_percentages_norm_steps["categories"] == category]
+        fig.add_trace(
+            go.Scatter(
+                x=category_data['step'], 
+                y=category_data['percentage'],
+                mode="lines+markers",
+                name=category,
+                line=dict(color=palette.get(category, 'grey'))
+            ), row=1, col=1
+        )
+    
+    # Add normalized line plot traces (Optimal)
+    for category in categories:
+        category_data = S_T_opt_fin_percentages_norm_steps[S_T_opt_fin_percentages_norm_steps["categories"] == category]
+        fig.add_trace(
+            go.Scatter(
+                x=category_data['step'], 
+                y=category_data['percentage'],
+                mode="lines+markers",
+                name=category,
+                line=dict(color=palette.get(category, 'grey')),
+                showlegend=False  # Show legend only on the first subplot
+            ), row=1, col=2
+        )
+    
+    # Combine datasets for bar plot
+    category_fin_means_norm['path'] = 'finished'
+    category_unf_means_norm['path'] = 'unfinished'
+    concat_means_norm = pd.concat([category_fin_means_norm, category_unf_means_norm])
+
+    # Prepare bar plot data
+    for category in categories:
+        bar_data_finished = concat_means_norm[(concat_means_norm['categories'] == category) & (concat_means_norm['path'] == 'finished')]
+        bar_data_unfinished = concat_means_norm[(concat_means_norm['categories'] == category) & (concat_means_norm['path'] == 'unfinished')]
+        
+   # Prepare bar plot data
+    bar_width = 0.4  # Set width for each bar
+        
+    for i, category in enumerate(categories):
+        bar_data_finished = concat_means_norm[(concat_means_norm['categories'] == category) & (concat_means_norm['path'] == 'finished')]
+        bar_data_unfinished = concat_means_norm[(concat_means_norm['categories'] == category) & (concat_means_norm['path'] == 'unfinished')]
+
+        # Add finished bar
+        fig.add_trace(
+            go.Bar(
+                x=[bar_data_finished['percentage_diff'].values[0]],
+                y=[i],
+                orientation='h',
+                width=bar_width,
+                marker=dict(color=palette.get(category, 'grey'), line=dict(width=0)),
+                name='Finished', 
+                showlegend=(i == 14)
+            ), row=1, col=3
+        )
+
+        # Add unfinished bar with hashing
+        fig.add_trace(
+            go.Bar(
+                x=[bar_data_unfinished['percentage_diff'].values[0]],
+                y=[i + bar_width],
+                orientation='h',
+                width=bar_width,
+                marker=dict(color=palette.get(category, 'grey'), pattern_shape="/"),
+                name='Unfinished',  
+                showlegend=(i == 14)
+            ), row=1, col=3
+        )
+
+    # Update layout
+    fig.update_layout(
+        title=title,
+        xaxis_title="Step",
+        xaxis2_title="Step",
+        yaxis=dict(title="Percentage", automargin=True, range=[0, 50]),
+        yaxis2=dict(automargin=True, range=[0, 50]),
+        yaxis3=dict(autorange="reversed"),  # Reverse the y-axis order
+        xaxis3_title="Percentage difference",
+        legend_title_text="Path Type",
+        template="plotly_white",
+        width=1300,
+        height=550
+    )
+
+    # Show the plot
+    fig.show()
+
 
 def filter_most_specific_category(df_categories):
     """
@@ -636,6 +828,64 @@ def filter_most_specific_category(df_categories):
     df_categories_filtered = df_categories_filtered.drop(columns=['count']).reset_index(drop=True)
 
     return df_categories_filtered
+
+def process_percentages(S_T_opt_fin_percentages, S_T_fin_percentages, category_map, max_step=10):
+    """
+    Processes and normalizes percentages for both user and optimal dataframes,
+    including reshaping, grouping, and normalization.
+
+    Parameters:
+    - S_T_opt_fin_percentages: DataFrame for optimal finished percentages.
+    - S_T_fin_percentages: DataFrame for user finished percentages.
+    - category_map: Mapping of articles to categories.
+    - max_step: Maximum step to keep in the output (default is 10).
+
+    Returns:
+    - S_T_fin_percentages_norm_steps: Processed DataFrame for user percentages.
+    - S_T_opt_fin_percentages_norm_steps: Processed DataFrame for optimal percentages.
+    """
+    def prepare_percentages(df, category_map, max_step):
+        """Unstacks, fills, maps categories, groups, and reshapes a DataFrame."""
+        # Unstack and reset
+        df = df.unstack(fill_value=0).stack(future_stack=True).reset_index()
+        
+        # Fill step columns with 0
+        step_cols = [col for col in df.columns if col.startswith('step_')]
+        df[step_cols] = df[step_cols].fillna(0)
+        
+        # Map categories
+        df['source_category'] = df['source'].map(category_map)
+        df['target_category'] = df['target'].map(category_map)
+        df['source_target'] = df['source_category'] + ' -> ' + df['target_category']
+        
+        # Group by source_target and level_2
+        df_norm_steps = df.groupby(['source_target', 'level_2'])[step_cols].mean().reset_index()
+        
+        # Further group by level_2
+        df_norm_steps = df_norm_steps.groupby(['level_2'])[step_cols].mean().reset_index()
+        
+        # Rename and filter columns
+        df_norm_steps = df_norm_steps.rename(columns={'level_2': 'categories'})
+        step_columns = [col for col in step_cols if int(col.split('_')[1]) <= max_step]
+        columns_to_keep = ['categories'] + step_columns
+        df_norm_steps = df_norm_steps[columns_to_keep]
+        
+        # Melt to long format
+        df_norm_steps = df_norm_steps.melt(id_vars=['categories'], 
+                                           var_name='step', 
+                                           value_name='percentage')
+        
+        # Extract step numbers and normalize percentages
+        df_norm_steps['step'] = df_norm_steps['step'].str.extract('(\d+)').astype(int)
+        df_norm_steps['percentage'] = df_norm_steps.groupby('step')['percentage'].transform(lambda x: x / x.sum() * 100)
+        return df_norm_steps
+
+    # Process both user and optimal dataframes
+    S_T_fin_percentages_norm_steps = prepare_percentages(S_T_fin_percentages, category_map, max_step)
+    S_T_opt_fin_percentages_norm_steps = prepare_percentages(S_T_opt_fin_percentages, category_map, max_step)
+    
+    return S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_norm_steps
+
 
 def get_position_frequencies(df, max_position=5):
     """
@@ -672,77 +922,6 @@ def get_position_frequencies(df, max_position=5):
 
     return position_data_df
 
-def plot_position_line(df_position, df_article, title="Category transitions frequencies across Path Positions"):
-    """
-    Plot an interactive line plot of category frequencies across positions with both normalized and non-normalized views.
-    
-    Parameters:
-        df_position (DataFrame): DataFrame with position frequencies for each category.
-        df_article (DataFrame): DataFrame containing article categories for dynamic palette generation.
-        title (str): Title of the plot.
-    """
-    # Extract and sort categories
-    categories = sorted(df_article["category"].unique())
-    palette_category = sn.color_palette("tab20", len(categories))
-    
-    # Add black for the `<` category
-    categories.append("<")  # Add `<` to the category list
-    palette_category = [f"rgb({r*255},{g*255},{b*255})" for r, g, b in palette_category]
-    color_mapping = dict(zip(categories, palette_category))
-    color_mapping["<"] = "rgb(0,0,0)"  # Explicitly assign black to `<`
-    
-    # Prepare data for normalized frequencies
-    df_position_norm = df_position.copy()
-    df_position_norm['Normalized Frequency'] = df_position_norm.groupby('Position')['Frequency'].transform(lambda x: (x / x.sum()) * 100)
-    
-    # Create subplots with separate y-axes
-    fig = make_subplots(
-        rows=1, cols=2, subplot_titles=("Non-Normalised Frequencies", "Frequencies Normalised by Total Number of Articles per Position"),
-        horizontal_spacing=0.05
-    )
-    # Add non-normalized line plot traces
-    unique_categories = sorted(df_position['Category'].unique())
-    for category in unique_categories:
-        category_data = df_position[df_position['Category'] == category]
-        fig.add_trace(
-            go.Scatter(
-                x=category_data['Position'], 
-                y=category_data['Frequency'],
-                mode="lines+markers",
-                name=category,
-                line=dict(color=color_mapping.get(category, "rgb(0,0,0)"))  # Use black as default if not mapped
-            ), row=1, col=1
-        )
-    
-    # Add normalized line plot traces
-    for category in unique_categories:
-        category_data_norm = df_position_norm[df_position_norm['Category'] == category]
-        fig.add_trace(
-            go.Scatter(
-                x=category_data_norm['Position'], 
-                y=category_data_norm['Normalized Frequency'],
-                mode="lines+markers",
-                name=category,
-                line=dict(color=color_mapping.get(category, "rgb(0,0,0)")),
-                showlegend=False  # Show legend only on the first subplot
-            ), row=1, col=2
-        )
-
-    # Update layout for better readability with separate y-axes
-    fig.update_layout(
-        title=title,
-        xaxis_title="Position in Path",
-        yaxis=dict(title="Frequency"),
-        xaxis2_title="Position in Path",
-        yaxis2=dict(title="Percentage (%)"),
-        legend_title_text="Category",
-        template="plotly_white",
-        width=1200,
-        height=600
-    )
-    
-    # Show the interactive plot
-    fig.show()
     
 def check_voyage_status(row):
     """
