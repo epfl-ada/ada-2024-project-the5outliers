@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sn
 import plotly.express as px
 import plotly.graph_objs as go
+from plotly.subplots import make_subplots
 
 def hex_to_rgba(hex_color):
     # Remove the hash symbol if present
@@ -12,6 +13,17 @@ def hex_to_rgba(hex_color):
     return f'rgba({int(hex_color[0:2], 16)},{int(hex_color[2:4], 16)},{int(hex_color[4:6], 16)},{0.2})'
 
 def compute_steady_state(markov_transitions, df_article_names, backclicks=False):
+    """
+    Compute the steady state distribution of a Markov chain.
+    Parameters:
+    markov_transitions (numpy.ndarray): A square matrix representing the transition probabilities of the Markov chain.
+    df_article_names (pandas.Series): A series containing the names of the articles corresponding to the states of the Markov chain.
+    backclicks (bool, optional): If True, includes a backclick state represented by '<' in the article names. Default is False.
+    Returns:
+    pandas.DataFrame: A DataFrame with two columns:
+        - 'articles': The names of the articles (states).
+        - 'steady_state_proportion': The steady state distribution of the Markov chain.
+    """
 
 
     val, vec = np.linalg.eig(markov_transitions.T)
@@ -26,7 +38,7 @@ def compute_steady_state(markov_transitions, df_article_names, backclicks=False)
 
     return steady_state
 
-def get_nth_transition_matrix(df, article_names, transition, normalise=True):
+def get_nth_transition_matrix(df, article_names, transition, backclicks=False, normalise=True):
     """
     Create the nth transition matrix based on the user paths.
 
@@ -38,6 +50,9 @@ def get_nth_transition_matrix(df, article_names, transition, normalise=True):
     Returns:
     - pd.DataFrame: A transition matrix for the nth position, with article_names as both rows and columns. Missing transitions are filled with 0.
     """
+
+    if backclicks:
+        article_names = pd.concat([pd.Series(['<'], name='article'), article_names], names='article').reset_index(drop=True)
     
     df = df.copy()
     df['path_split'] = df['path'].str.split(';')
@@ -136,7 +151,7 @@ def get_step_divergences(df_article_names, parser, df_paths, num_steps=10, df_ca
 
     for n in range(1, num_steps + 1):
         # Get transition matrices for the nth step for both users and Markov.
-        user_transitions_n = get_nth_transition_matrix(df_paths, df_article_names, n)
+        user_transitions_n = get_nth_transition_matrix(df_paths, df_article_names, n, backclicks=backclicks)
 
         # Compute KL divergence for each transition.
         KL_n = np.where((user_transitions_n > 0) & (markov_transitions > 0),
@@ -144,6 +159,10 @@ def get_step_divergences(df_article_names, parser, df_paths, num_steps=10, df_ca
         KL_n_df = pd.DataFrame(KL_n, columns=user_transitions_n.columns, index=user_transitions_n.index)
         
         if df_categories is not None:
+            if backclicks:
+                df_categories = df_categories[['article', 'level_1']]
+                df_categories = pd.concat([pd.DataFrame([['<', '<']], columns=['article', 'level_1']), df_categories], ignore_index=True)
+            
             # Inverse rows and columns and get article as a column
             KL_cat_n_df = KL_n_df.T.reset_index(names='article')
             KL_cat_n_df = KL_cat_n_df.merge(right=df_categories[['article', 'level_1']], on='article', how='left')
@@ -204,26 +223,31 @@ def plot_article_step_divergence(step_divergence, color_dict):
                 annotation_font=dict(size=12, color="black"))
 
     for article in df_combined['article'].unique():
-
         article_data = df_combined[df_combined['article'] == article].reset_index(drop=True)
         x = article_data['Step'].to_list()
         y = article_data['Divergence']
         upper_bound = y + article_data['Error']
         lower_bound = y - article_data['Error']
 
+        # Line trace
         fig.add_trace(go.Scatter(
-            x=x, y=y, name=article,
-            line_color=color_dict[article]
+            x=x, y=y, 
+            name=article,
+            line_color=color_dict[article],
+            legendgroup=article,  # Group traces by article name
+            showlegend=True
         ))
 
-        fig.add_traces(go.Scatter(
-            x=x+x[::-1], # x, then x reversed
-            y=upper_bound.to_list()+lower_bound.to_list()[::-1], # upper, then lower reversed
+        # Error region trace
+        fig.add_trace(go.Scatter(
+            x=x + x[::-1],  # x, then reversed x
+            y=upper_bound.to_list() + lower_bound.to_list()[::-1],  # upper, then lower reversed
             fill='toself',
-            fillcolor=hex_to_rgba(color_dict[article]),
-            line=dict(color='rgba(255,255,255,0)'),
-            hoverinfo="skip",
-            showlegend=False
+            fillcolor=hex_to_rgba(color_dict[article]),  # Convert color for transparency
+            line=dict(color='rgba(255,255,255,0)'),  # Invisible border line
+            hoverinfo="skip",  # Skip hover info for the region
+            showlegend=False,  # Do not show a separate legend entry
+            legendgroup=article  # Group with the corresponding line trace
         ))
 
     fig.update_layout(
@@ -238,7 +262,7 @@ def plot_article_step_divergence(step_divergence, color_dict):
         title=dict(text="Stepwise Divergence from Random Path")
     )
 
-    fig.show()
+    return fig
 
 def plot_category_step_divergence(step_divergence, color_dict):
     """
@@ -276,7 +300,8 @@ def plot_category_step_divergence(step_divergence, color_dict):
 
         fig.add_trace(go.Scatter(
             x=x, y=y, name=cat,
-            line_color=color_dict[cat]
+            line_color=color_dict[cat],
+            legendgroup=cat
         ))
 
         fig.add_traces(go.Scatter(
@@ -286,7 +311,8 @@ def plot_category_step_divergence(step_divergence, color_dict):
             fillcolor=hex_to_rgba(color_dict[cat]),
             line=dict(color='rgba(255,255,255,0)'),
             hoverinfo="skip",
-            showlegend=False
+            showlegend=False,
+            legendgroup=cat
         ))
 
     fig.update_layout(
@@ -298,11 +324,11 @@ def plot_category_step_divergence(step_divergence, color_dict):
         yaxis=dict(title='Divergence Value'),
         width=800,  # Set the width of the plot
         height=600, # Set the height of the plot
-        title=dict(text="Stepwise Divergence from Random Path")
+        title=dict(text="Stepwise Divergence from Random Path"),
+        legend_tracegroupgap=3
     )
 
-    fig.show()
-
+    return fig
 
 def markov_example(parser, user_transitions):
     """
