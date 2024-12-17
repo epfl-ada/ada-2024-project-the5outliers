@@ -59,12 +59,15 @@ def read_all():
 
     # ---- Users Path Metrics ----
     # Process unfinished paths
+    df_unfinished['source'] = df_unfinished['path'].apply(lambda x: x.split(';')[0])
     df_unfinished['cosine_similarity'] = df_unfinished.apply(lambda x: find_shortest_distance(x, df_sm), axis=1)
     df_unfinished['shortest_path'] = df_unfinished.apply(lambda x: find_shortest_distance(x, df_shortest_path_length), axis=1)
     df_unfinished['path_length'] = df_unfinished['path'].apply(lambda x: x.count(';') + 1)
     df_unfinished['back_clicks'] = df_unfinished['path'].apply(lambda x: x.count('<'))
     df_unfinished['categories_similarity'] = df_unfinished.apply(lambda x: find_shortest_distance(x, df_scat), axis=1)
     # Process finished paths
+    df_finished['source'] = df_finished['path'].apply(lambda x: x.split(';')[0])
+    df_finished['target'] = df_finished['path'].apply(lambda x: x.split(';')[-1])
     df_finished['cosine_similarity'] = df_finished.apply(lambda x: find_shortest_distance(x, df_sm), axis=1)
     df_finished['shortest_path'] = df_finished.apply(lambda x: find_shortest_distance(x, df_shortest_path_length), axis=1)
     df_finished['path_length'] = df_finished['path'].apply(lambda x: x.count(';') + 1)
@@ -335,11 +338,8 @@ def find_shortest_distance(row, distance_matrix):
     Finds the start and the target of a path and returns the shortest distance between the two.
     Distance can be anything: shortest path, semantic cosine similarity, ...
     '''
-    
-    articles = row['path'].split(';')
-    if 'target' in row.index:
-        return distance_matrix.loc[articles[0]][row['target']]
-    return distance_matrix.loc[articles[0]][articles[-1]]
+
+    return distance_matrix.loc[row['source']][row['target']]
 
 def replace_back_clicks(path):
     '''

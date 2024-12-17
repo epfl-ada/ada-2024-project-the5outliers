@@ -1,14 +1,13 @@
 import pandas as pd
-import plotly
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
 from collections import Counter
-from matplotlib.colors import ListedColormap, BoundaryNorm
 import numpy as np
 import seaborn as sn
 import networkx as nx
+from tqdm import tqdm
 
 def create_treemap_data(df):
     """
@@ -205,7 +204,6 @@ def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_lev
     })
     
     return df_common_paths
-    
 
 def analyze_categories_paths(df_paths, df_categories, users=True, omit_loops=False):
     """
@@ -260,7 +258,6 @@ def analyze_categories_paths(df_paths, df_categories, users=True, omit_loops=Fal
     
     return df_common_paths
 
-
 def find_all_source_target_pairs(df_finished, df_unfinished, df_links):
     """
     Extracts and deduplicates all source-target pairs from finished and unfinished paths,
@@ -311,7 +308,6 @@ def count_start_and_target_per_articles(df_finished, df_unfinished, df_article):
     df_article['target_count'] = df_article['article'].map(target_count)
     
     return None
-
 
 def find_shortest_path(row, G):
     """
@@ -404,56 +400,6 @@ def map_path_to_categories(path, article_to_category):
         return [article_to_category.get(article, 'Unknown') for article in path]
     return None
 
-
-def clean_path_list(path):
-    """
-    Cleans a path list by removing occurrences of '<' and the preceding element.
-
-    Parameters:
-    - path: List of elements representing a path.
-
-    Returns:
-    - A cleaned list with '<' and its preceding elements removed.
-    """
-    while '<' in path:
-        idx = path.index('<')
-        del path[idx - 1:idx + 1]  # Remove the element before '<' and '<' itself
-    return path
-
-
-def users_paths(df_finished, df_unfinished, article_to_category):
-    """
-    Processes paths for finished and unfinished users by extracting sources, targets, and path categories.
-
-    Parameters:
-    - df_finished: DataFrame containing finished paths with a 'path_list' column.
-    - df_unfinished: DataFrame containing unfinished paths with a 'path' column (semicolon-separated strings).
-    - article_to_category: Dictionary mapping articles to categories.
-
-    Returns:
-    - Tuple of DataFrames (users_finished, users_unfinished), each containing processed paths and path categories.
-    """
-    # Process finished paths
-    df_finished['source'] = df_finished['path_list'].apply(lambda x: x[0])  # First element in path
-    df_finished['target'] = df_finished['path_list'].apply(lambda x: x[-1])  # Last element in path
-    users_finished = df_finished[['source', 'target', 'path_list']].copy()
-    users_finished['path_list'] = users_finished['path_list'].apply(clean_path_list)
-    users_finished['path_categories'] = users_finished['path_list'].apply(
-        lambda path: map_path_to_categories(path, article_to_category)
-    )
-
-    # Process unfinished paths
-    users_unfinished = df_unfinished[['source', 'target', 'path']].copy()
-    users_unfinished['path'] = users_unfinished['path'].str.split(';')
-    users_unfinished['path'] = users_unfinished['path'].apply(clean_path_list)
-    users_unfinished = users_unfinished[users_unfinished['path'].apply(lambda x: len(x) > 1)]
-    users_unfinished['path_categories'] = users_unfinished['path'].apply(
-        lambda path: map_path_to_categories(path, article_to_category)
-    )
-
-    return users_finished, users_unfinished
-
-
 def filter_pairs(optimal_paths, users_finished, users_unfinished):
     """
     Filters and aligns source-target pairs across optimal, finished, and unfinished datasets.
@@ -486,19 +432,18 @@ def filter_pairs(optimal_paths, users_finished, users_unfinished):
 
     return optimal_fin, users_finished, optimal_unf, users_unfinished
 
-
 def calculate_group_step_percentages(group, unfinished):
     """
     Calculates the percentage of categories at each step within a group.
 
     Parameters:
-    - group: DataFrame group containing a 'path_categories' column.
+    - group: DataFrame group containing a 'Category Path' column.
     - unfinished: Boolean indicating if the paths are unfinished (affects slicing logic).
 
     Returns:
     - DataFrame with percentage distributions at each step.
     """
-    paths = pd.DataFrame(group['path_categories'].tolist())
+    paths = pd.DataFrame(group['Category Path'].tolist())
     if unfinished:
         paths = paths.iloc[:, 1:]  # Exclude the source
     else:
@@ -509,7 +454,6 @@ def calculate_group_step_percentages(group, unfinished):
         for i, step in enumerate(paths.columns)
     ]
     return pd.concat(step_percentages, axis=1).fillna(0)
-
 
 def calculate_step_percentages(optimal_fin, users_finished, optimal_unf, users_unfinished):
     """
@@ -534,11 +478,11 @@ def calculate_step_percentages(optimal_fin, users_finished, optimal_unf, users_u
     S_T_opt_unf_percentages = optimal_unf.groupby(['source', 'target']).apply(
         lambda g: calculate_group_step_percentages(g, unfinished=False)
     )
+    users_unfinished = users_unfinished[users_unfinished['path_length'] > 1]
     S_T_unf_percentages = users_unfinished.groupby(['source', 'target']).apply(
         lambda g: calculate_group_step_percentages(g, unfinished=True)
     )
     return S_T_opt_fin_percentages, S_T_fin_percentages, S_T_opt_unf_percentages, S_T_unf_percentages
-
 
 def calculate_average_percentages(dataframes, column_names):
     """
@@ -557,7 +501,6 @@ def calculate_average_percentages(dataframes, column_names):
         avg_df.columns = column_names[:3] + [f'percentage_{suffix}']
         results.append(avg_df)
     return results
-
 
 def merge_and_calculate_difference(df1, df2, key_columns, diff_columns):
     """
@@ -736,57 +679,7 @@ def plot_position_line(df_position, df_article, title="Category transitions freq
     
     # Show the interactive plot
     fig.show()
-
-def plot_normalized_position_bar(df_position, title="Normalized Category Frequencies Across Path Positions"):
-    """
-    Plot a normalized stacked bar chart of category frequencies across positions.
     
-    Parameters:
-        df_position (DataFrame): DataFrame with position frequencies for each category.
-    """
-    # Prepare data for normalized frequencies
-    df_position_norm = df_position.copy()
-    df_position_norm['Normalized Frequency'] = df_position_norm.groupby('Position')['Frequency'].transform(lambda x: (x / x.sum()) * 100)
-    
-    # Define a color map for categories
-    unique_categories = df_position['Category'].unique()
-    colors = px.colors.qualitative.Plotly  # Select a color scheme
-    color_map = {category: colors[i % len(colors)] for i, category in enumerate(unique_categories)}
-    
-    # Create a subplot structure (only one subplot here for normalized bar chart)
-    fig = make_subplots(
-        rows=1, cols=1, subplot_titles=("Normalized Category Frequencies Across Path Positions",),
-        horizontal_spacing=0.15
-    )
-    
-    # Add traces for each category with consistent colors
-    for category in unique_categories:
-        category_data_norm = df_position_norm[df_position_norm['Category'] == category]
-        fig.add_trace(
-            go.Bar(
-                x=category_data_norm['Position'], 
-                y=category_data_norm['Normalized Frequency'],
-                name=category,
-                marker_color=color_map[category]
-            ), row=1, col=1
-        )
-    
-    # Set bar mode to stack
-    fig.update_layout(
-        barmode="stack",
-        title=title,
-        xaxis=dict(title="Position in Path", tickmode="linear", dtick=1),  # Ensure integer x-axis ticks
-        yaxis=dict(title="Percentage (%)"),
-        legend_title_text="Category",
-        template="plotly_white",
-        width=900,
-        height=600
-    )
-    
-    # Show the interactive plot
-    fig.show()
-    
-
 def check_voyage_status(row):
     """
     Check if the path is a Wikispeedia_Voyage, that is whether categories (not source and target) are 'Voyages'. 
@@ -831,25 +724,22 @@ def game_voyage_sorting(df_article_paths, df_categories):
     
     return df_article_paths
 
-
-def plot_sankey_voyage(df):
+def plot_sankey_voyage(df, background_color='transparent'):
     """
     Plots a Sankey diagram to visualize the distribution of paths classified as 'Voyage' or 'Non-Voyage'.
 
     Parameters:
-        df (DataFrame): DataFrame containing boolean 'Wiki_Voyage' and 'source_maincategory', 'target_maincategory'  columns
+        df (DataFrame): DataFrame containing boolean 'Wiki_Voyage' and 'source_maincategory', 'target_maincategory' columns
+        background_color (str): Background color of the plot ('white' or 'transparent').
 
     Returns:
-        None: it displays the Sankey diagram 
+        Figure: Sankey diagram as a Plotly Figure object.
     """
 
-    #voyage_categories = ['Geography of Great Britain', 'Geography of Asia', 'Geography of Oceania Australasia', 'North American Geography', 'European Geography', 'African Geography', 'Central and South American Geography', 'Antarctica', 'Geography of the Middle East','Countries']
-    
-    df_all_voyage = df.copy()
-
     # Mapping for start, voyage, and end nodes
-    df_all_voyage['source_category_label'] = df_all_voyage['source_maincategory'].apply(lambda x: 'Source is a World Regions' if x=='World Regions' else 'Source is not a World Regions')
-    df_all_voyage['target_category_label'] = df_all_voyage['target_maincategory'].apply(lambda x: 'Target is a World Regions' if x=='World Regions' else 'Target is not a World Regions')
+    df_all_voyage = df.copy()
+    df_all_voyage['source_category_label'] = df_all_voyage['source_maincategory'].apply(lambda x: 'Source is a World Regions' if x == 'World Regions' else 'Source is not a World Regions')
+    df_all_voyage['target_category_label'] = df_all_voyage['target_maincategory'].apply(lambda x: 'Target is a World Regions' if x == 'World Regions' else 'Target is not a World Regions')
     df_all_voyage['voyage_label'] = df_all_voyage['Wikispeedia_Voyage'].apply(lambda x: 'Voyages' if x else 'Non-Voyages')
 
     # Start→Voyage flows
@@ -890,10 +780,11 @@ def plot_sankey_voyage(df):
         '#2CB5AE',  # Voyage
         '#4b4b4b',  # Non-Voyage
         '#2CB5AE',  # Target in Countries/Geography
-        '#4b4b4b'  # Target not in Countries/Geography
+        '#4b4b4b'   # Target not in Countries/Geography
     ]
 
-    link_colors=['rgba(75, 75, 75, 0.3)',  # not voyage
+    link_colors = [
+        'rgba(75, 75, 75, 0.3)',  # not voyage
         'rgba(75, 75, 75, 0.3)',  # not voyage
         'rgba(44, 181, 174, 0.3)',  # Voyage
         'rgba(75, 75, 75, 0.3)',  # not voyage
@@ -901,68 +792,32 @@ def plot_sankey_voyage(df):
         'rgba(44, 181, 174, 0.3)'  # Voyage
     ]
 
+    # Determine the background color
+    if background_color == 'transparent':
+        paper_bgcolor = 'rgba(0,0,0,0)'  # Transparent
+        plot_bgcolor = 'rgba(0,0,0,0)'   # Transparent
+    else:
+        paper_bgcolor = background_color  # Solid color
+        plot_bgcolor = background_color   # Solid color
+
     # Create the Sankey diagram
     fig = go.Figure(data=[go.Sankey(
         node=dict(pad=15, thickness=20, line=dict(color="black", width=0), label=labels, color=node_colors),
-        link=dict(source=sources, target=targets, value=values, color= 'rgba(60,60,60,0.3)', hovercolor=link_colors)
+        link=dict(source=sources, target=targets, value=values, color='rgba(60,60,60,0.3)')
     )])
-    
+
     fig.update_layout(
         title_text="Voyage and Non-Voyage Paths",
         font_size=10,
         title_font_size=14,
         title_x=0.5,
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
+        paper_bgcolor=paper_bgcolor,
+        plot_bgcolor=plot_bgcolor
     )
-    
+
     fig.show()
     return fig
-    #return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
-
-def backtrack(paths) :
-    """
-    Compute the number of backtracks in each path.
-    """
-
-    paths["path_list"] = paths["path"].apply(lambda x: x.split(";"))
-    paths["back_nb"]=paths["path_list"].apply(lambda x: x.count("<"))
-    paths["size"]=paths["path_list"].apply(lambda x: len(x))
-    paths["have_back"] = paths["back_nb"] > 0
-
-    return paths
-
-def find_category_path(path_list, categories) :
-    """
-    Find the list of category for a given list of articles.
-    """
-    categories = [categories[categories["article"]==article]["level_1"].values[0] for article in path_list if article in categories["article"].values]
-    return categories
-
-def extract_category_path(paths, categories) :
-    """
-    Extract the category path for each path.
-    """
-    paths["path_list"] = paths["path"].apply(lambda x: x.split(";"))
-    paths["category"] = paths["path_list"].apply(lambda x: find_category_path(x, categories))
-    paths["category"] = paths["category"].apply(lambda x : list(set(list(x))))
-    return paths
-
-def find_categories_start_end(paths, categories) :
-    
-    """
-    Find the start and end category of each path.
-    """
-
-    paths["start"] = paths["path"].apply(lambda x: x.split(";")[0])
-    if "target" in paths.columns:
-        paths["end"] = paths["target"]
-    else :
-        paths["end"] = paths["path"].apply(lambda x: x.split(";")[-1])
-    paths["start_category"] = paths["start"].apply(lambda x: categories[categories["article"] == x]["category"].values[0].split(".")[1] if x in categories["article"].values else None)
-    paths["end_category"] = paths["end"].apply(lambda x: categories[categories["article"] == x]["category"].values[0].split(".")[1] if x in categories["article"].values else None)
-
-    return paths
+   #return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
 
 def plot_cooccurrence_cat_matrix(df_categories, abbreviations=None):
     """
@@ -1078,33 +933,6 @@ def matrix_common_paths(data):
             transition_matrix.at[from_cat, to_cat] = count
     
     return transition_matrix
-
-def transition_cat_matrix(df):
-    # Get max value for setting the color scale
-    max_value = df.values.max()
-
-    # Define thresholds and corresponding colors
-    thresholds = [0, 100, 500, 1000, 5000, 10000, max_value]  # Adjust based on data range
-    colors = ["#f0f0f0", "#a6bddb", "#3690c0", "#034e7b", "#feb24c", "#f03b20"]
-    cmap = ListedColormap(colors)
-    cmap.set_bad(color='white')  # Set masked cells to appear white
-    norm = BoundaryNorm(thresholds, len(colors))
-
-
-    plt.figure(figsize=(9, 9))
-
-    # Mask zeros for better visibility in log scale
-    mask = df == 0
-    sn.heatmap(df, annot=True, annot_kws={"size": 9}, fmt="d", 
-                mask=mask, cmap=cmap, norm=norm, cbar_kws={'label': 'Count', 'shrink': 0.6} , square=True)
-    plt.title('Transition within categories')
-    plt.xlabel('To Category')
-    plt.ylabel('From Category')
-    plt.xticks(rotation=45, ha="right", fontsize=8)
-    plt.yticks(fontsize=8) 
-
-    plt.tight_layout()
-    plt.show()
 
 def plot_articles_pie_chart(df, palette, abbreviations=None):
     """
@@ -1318,9 +1146,6 @@ def plot_proportions_of_in_and_out_degree_in_categories(df, palette, abbreviatio
     plt.suptitle("Proportions of in and out degree links by Category", fontsize=16, y=1.05)
     plt.tight_layout(rect=[0, 0, 0.85, 1])  # Adjust for the legend
     plt.show()
-
-
-  
     
 def add_legend_category(fig, palette_category, categories, bbox_to_anchor=(1.15, 0.85)):
 
@@ -1375,7 +1200,6 @@ def plot_proportion_category_start_stop_pies(df_article, palette, abbreviations=
 
     start_labels, start_legend_labels = prepare_labels(start_dict)
     target_labels, target_legend_labels = prepare_labels(target_dict)
-
 
     # subplots
     fig, ax = plt.subplots(1, 2, figsize=(15, 7))
@@ -1475,7 +1299,6 @@ def plot_article_popularity_link_density(df_article, df_finished_voyage, palette
     plt.tight_layout()
     plt.show()
 
-
 def remove_outliers(df, col):
     Q1 = df[col].quantile(0.25)
     Q3 = df[col].quantile(0.75)
@@ -1483,10 +1306,12 @@ def remove_outliers(df, col):
     filtered_df = df[(df[col] >= (Q1 - 1.5 * IQR)) & (df[col] <= (Q3 + 1.5 * IQR))]
     return filtered_df
 
-
-def plot_difficulties_voyage (df_finished_voyage, df_unfinished_voyage, palette_category_dict):
+def plot_difficulties_voyage (df_finished, df_unfinished, palette_category_dict):
     color_voyage = palette_category_dict['World Regions']
     
+    df_finished_voyage = df_finished.copy()
+    df_unfinished_voyage = df_unfinished.copy()
+
     df_finished_voyage["finished"] = True
     df_finished_voyage["cte"] = 1
     df_unfinished_voyage["finished"] = False
@@ -1626,121 +1451,11 @@ def plot_difficulties_voyage (df_finished_voyage, df_unfinished_voyage, palette_
 
     fig.show()
 
-    
-def plot_shortest_paths_matrix(df_shortest_path):
+def location_click_on_page(df, parser):
+    df['position'] = np.NaN
 
-    # Total number of article pairs
-    total_pairs = df_shortest_path.size
-
-    # Number of reachable pairs (distance from 1 to 9)
-    # Exclude self-pairs where distance is 0
-    # Unreachable pairs are represented by -1
-
-    # Create a mask for self-pairs (distance == 0)
-    self_pairs_mask = (df_shortest_path == 0)
-
-    # Create a mask for reachable pairs (distance between 1 and 9)
-    reachable_mask = (df_shortest_path >= 1) & (df_shortest_path <= 9)
-
-
-    reachable_pairs = np.count_nonzero(reachable_mask)
-    unreachable_pairs = np.count_nonzero(df_shortest_path == -1)
-
-    # Sparsity percentage: proportion of unreachable pairs
-    sparsity_percentage = ((unreachable_pairs + len(self_pairs_mask) ) / total_pairs) * 100
-
-    print(f"Total pairs: {total_pairs}")
-    print(f"Reachable pairs: {reachable_pairs}")
-    print(f"Unreachable pairs: {unreachable_pairs}")
-    print(f"Sparsity percentage: {sparsity_percentage:.2f}%")
-
-    # Create a binary matrix where 1 represents a reachable path and 0 represents an unreachable path
-    sparsity_matrix = np.where(df_shortest_path == -1, 0, 1)
-
-    plt.figure(figsize=(10, 8))
-    plt.imshow(sparsity_matrix, cmap='Greys', interpolation='nearest')
-    plt.title('Sparsity Pattern in Shortest Path Matrix')
-    plt.xlabel('Target Article')
-    plt.ylabel('Source Article')
-    plt.colorbar(label='Reachability (1=Reachable, 0=Unreachable)')
-    plt.show()
-
-   
-def generate_random_path(start, articles_links, nb_articles=30):
-    
-    if start not in articles_links or len(articles_links[start]) == 0:
-        return start
-    
-    random_path = [start]
-    
-    while len(random_path) < nb_articles:
-        # print(random_path)
-        if random_path[-1] == "<":
-            valid_art = [random_path[i] for i in range(len(random_path)) if (i == 0 or random_path[i-1] != '<') and (i == len(random_path)-1 or random_path[i+1] != '<') and random_path[i] != '<']
-            next_article = np.random.choice(articles_links[valid_art[-1] if len(valid_art)>0 else valid_art])
-            
-        elif random_path[-1] not in articles_links :
-            # print(random_path)
-            random_path.pop(-1) 
-            continue
-        
-        elif len(articles_links[random_path[-1]]) == 0:
-            next_article = "<"
-            
-        else :
-            next_article = np.random.choice(articles_links[random_path[-1]]) 
-        
-        if next_article in articles_links or next_article == "<":
-            random_path.append(next_article)  
-                     
-    return ";".join(random_path)
-
-def compute_mean_of_lists(df):
-    for column in df.columns:
-        # Apply mean to each list in the column and replace the list with its mean
-        df[column] = df[column].apply(lambda x: sum(x) / len(x) if isinstance(x, list) else x)
-    return df
-
-def compute_proba_links(df_categories, parser) : 
-    article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
-    articles_links = {article: data["total_links"] for article, data in parser.parsed_articles.items()}
-    articles_categories_list = {}
-    articles_categories_proba = {}
-    cat_to_cat_proba = {}
-    for article in articles_links :
-        articles_categories_list[article] = []
-        for link in articles_links[article] :
-            articles_categories_list[article].append(article_to_category.get(link, "None"))
-        articles_categories_proba[article] = {category: articles_categories_list[article].count(category) / len(articles_categories_list[article]) for category in set(articles_categories_list[article])}
-        
-        if article_to_category.get(article, "None") not in cat_to_cat_proba.keys() :
-            cat_to_cat_proba[article_to_category.get(article, "None")] = {}
-            
-        for category in set(articles_categories_list[article]) :
-            if category not in cat_to_cat_proba[article_to_category.get(article, "None")].keys() :
-                cat_to_cat_proba[article_to_category.get(article, "None")][category] = [articles_categories_proba[article][category]]
-            else :  
-                cat_to_cat_proba[article_to_category.get(article, "None")][category].append(articles_categories_proba[article][category])
-                
-    df = pd.DataFrame.from_dict(cat_to_cat_proba)
-    df = compute_mean_of_lists(df)
-    df["<"] = 1
-    df.loc["<"] = 1
-    df
-    return df, articles_categories_proba, articles_categories_list
-
-def compute_proba_path(path, cat_to_cat_proba_df):
-    path = path.split(" -> ")
-    proba_path = 1
-    for i in range(min(len(path)-1, 1)):
-        proba_path *= cat_to_cat_proba_df[path[i]][path[i+1]]
-    return proba_path #** (1 / (len(path)))
-
-def location_click_on_page(df_finished, parser):
-    df_finished['position'] = np.NaN
-
-    for i in range(len(df_finished)):
-        articles = df_finished['path'][i].split(';')
+    for i in range(len(df)):
+        articles = df['path'][i].split(';')
         
         position = []
         for a in range(len(articles)-1):
@@ -1749,10 +1464,8 @@ def location_click_on_page(df_finished, parser):
             else:
                 info = parser.find_link_positions(articles[a], articles[a+1])
                 position.append(info['article_link_position'][0]/info['total_links'] if len(info['article_link_position']) != 0 else np.NaN)
-        df_finished.loc[i, 'position'] = np.mean(position)
-    return df_finished
-
-from tqdm import tqdm
+        df.loc[i, 'position'] = np.mean(position)
+    return df
 
 def find_category_position_articles(parser, df_categories, categories_others) :
 

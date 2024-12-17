@@ -186,8 +186,8 @@ def plot_network(H, df_categories, palette, title="Network Graph", node_size=700
         )
     
     # LEGEND BOX----------------------------------------------------------------------------
-    palette_without_others=palette.pop('Others',palette)
-    
+    palette_without_others = {k: v for k, v in palette.items() if k != 'Others'}
+
     if node_abbreviations:
         legend_entries = {node: f"{node} ({node_abbreviations.get(node, node)})" for node in H.nodes}
     else:

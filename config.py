@@ -42,7 +42,8 @@ CATEGORIES_OTHERS = [
 
 # Highlight colors for specific categories
 HIGHLIGHT_COLORS = {
-    'World Regions': '#1AC5BD'
+    'World Regions': '#1AC5BD',
+    'Others': '#696e79'
 }
 
 # Generate shades of grey for remaining categories
