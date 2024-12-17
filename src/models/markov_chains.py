@@ -3,7 +3,28 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sn
 import plotly.express as px
+import plotly.graph_objs as go
 
+def hex_to_rgba(hex_color):
+    # Remove the hash symbol if present
+    hex_color = hex_color.lstrip('#')
+
+    return f'rgba({int(hex_color[0:2], 16)},{int(hex_color[2:4], 16)},{int(hex_color[4:6], 16)},{0.2})'
+
+def compute_steady_state(markov_transitions, df_article_names, backclicks=False):
+
+
+    val, vec = np.linalg.eig(markov_transitions.T)
+    ss = np.real(-vec[:, 0]) / np.real(-vec[:, 0]).sum()
+
+    if backclicks:
+        df_article_names = pd.concat([pd.Series('<'), df_article_names]).reset_index(drop=True)
+
+    steady_state =pd.DataFrame()
+    steady_state['articles'] = df_article_names
+    steady_state['steady_state_proportion'] = ss
+
+    return steady_state
 
 def get_nth_transition_matrix(df, article_names, transition, normalise=True):
     """
@@ -93,130 +114,253 @@ def get_transition_probabilities(df_article_names, parser, backclicks=False, nor
 
     return transition_probabilities
 
-def get_step_divergences(df_article_names, parser, df_paths, num_steps=10):
+def get_step_divergences(df_article_names, parser, df_paths, num_steps=10, df_categories=None, backclicks=False):
     """
-    Calculate the step-wise divergences between user transitions and Markov chain transitions.
+    Calculate the Kullback-Leibler (KL) divergence between user transition matrices and Markov transition matrices 
+    for a given number of steps and return the mean and standard deviation of the KL divergence for each step.
+    
     Parameters:
-    df_article_names (pd.DataFrame): DataFrame containing article names.
-    parser (object): Parser object to parse the articles.
-    df_paths (pd.DataFrame): DataFrame containing user paths.
-    num_steps (int, optional): Number of steps to consider for the transition matrices. Default is 10.
+    -----------
+        df_article_names (pd.DataFrame): DataFrame containing article names.
+        parser (object): Parser object to process the articles.
+        df_paths (pd.DataFrame): DataFrame containing user navigation paths.
+        num_steps (int, optional): Number of steps to calculate the transition matrices for. Default is 10.
     Returns:
-    tuple: A tuple containing two DataFrames:
-        - mean_diff_step (pd.DataFrame): DataFrame of the mean differences between user and Markov transitions for each step.
-        - mean_KL_step (pd.DataFrame): DataFrame of the mean Kullback-Leibler (KL) divergences for each step.
+    --------
+        pd.DataFrame: DataFrame with MultiIndex columns containing the mean and standard deviation of the KL divergence 
+                    for each step. The rows are sorted by the mean KL divergence of the first step in descending order.
     """
     
+    KL_stats_step = []   # List to store mean and std of KL divergence for each step.
+    markov_transitions = get_transition_probabilities(df_article_names, parser, backclicks=backclicks)
 
-    mean_diff_step = [] #list of the difference between game and random : represents user choice 
-    mean_KL_step = []
-    markov_transitions = get_transition_probabilities(df_article_names, parser, backclicks=False)
-
-    for n in range(1, num_steps+1):
-        # get transition matrices of the 5 first steps of users and markov
+    for n in range(1, num_steps + 1):
+        # Get transition matrices for the nth step for both users and Markov.
         user_transitions_n = get_nth_transition_matrix(df_paths, df_article_names, n)
-        
-        # compute column wise sum of the difference between user and random : gives the sum of probalities of player voluntarily chosing to transition to article j
-        diff_n = user_transitions_n - markov_transitions
-        mean_diff_n = diff_n.sum(axis=0).sort_values(ascending=False)
-        mean_diff_step.append(mean_diff_n)
 
-        # compute KL
-        KL_n = np.where((user_transitions_n > 0) & (markov_transitions > 0), user_transitions_n * np.log(user_transitions_n / markov_transitions), 0)
+        # Compute KL divergence for each transition.
+        KL_n = np.where((user_transitions_n > 0) & (markov_transitions > 0),
+                        user_transitions_n * np.log(user_transitions_n / markov_transitions), 0)
         KL_n_df = pd.DataFrame(KL_n, columns=user_transitions_n.columns, index=user_transitions_n.index)
-        mean_KL_n = KL_n_df.sum(axis=0).sort_values(ascending=False)
-        mean_KL_step.append(mean_KL_n)
+        
+        if df_categories is not None:
+            # Inverse rows and columns and get article as a column
+            KL_cat_n_df = KL_n_df.T.reset_index(names='article')
+            KL_cat_n_df = KL_cat_n_df.merge(right=df_categories[['article', 'level_1']], on='article', how='left')
+            KL_cat_n_df = KL_cat_n_df.drop(columns='article')
 
-    return pd.DataFrame(mean_diff_step), pd.DataFrame(mean_KL_step)
+            group_means = pd.DataFrame()
+            group_means['mean'] = KL_cat_n_df.groupby('level_1').apply(lambda group: group.iloc[:, :-1].values.mean())
+            group_means['sem'] = KL_cat_n_df.groupby('level_1').apply(lambda group: group.iloc[:, :-1].values.std() / np.sqrt(group.iloc[:, :-1].size))
+
+            KL_stats_step.append(group_means)
+        else:
+            # Compute mean and standard deviation for KL divergence at this step.
+            KL_stats_step.append({
+                "mean": KL_n_df.mean(axis=0),
+                "sem": KL_n_df.sem(axis=0)
+            })
+
+    # Convert KL stats to a DataFrame with MultiIndex columns (mean and std).
+    KL_stats_step = pd.concat([pd.DataFrame(stats) for stats in KL_stats_step], keys=range(1, num_steps + 1), axis=1)
+    
+    # Flatten MultiIndex for clarity (step indices and metrics in single-level columns).
+    KL_stats_step.columns = pd.MultiIndex.from_tuples(
+        [(step, metric) for step, metric in KL_stats_step.columns]
+    )
+    
+    # Sort rows by the mean of the first step.
+    KL_stats_step = KL_stats_step.sort_values(by=(1, "mean"), ascending=False)
+
+    return KL_stats_step
 
 def plot_article_step_divergence(step_divergence, color_dict):
     """
-    Plots the stepwise divergence from a random path for different articles.
+    Plots the stepwise divergence (mean and std) from a random path for different articles.
     Parameters:
-    step_divergence (pd.DataFrame): A DataFrame where each column represents the cumulative divergence 
-                                    of an article at each step, and the index represents the steps.
+    step_divergence (pd.DataFrame): A DataFrame where each column represents the mean and std divergence
+                                    for an article at each step, and the index represents the articles.
+    color_dict (dict): A dictionary mapping article names to specific colors for plotting.
     Returns:
     None: This function displays a plot using Plotly Express.
     """
 
-    df_long = step_divergence.reset_index().melt(id_vars='index', var_name='Article', value_name='Cumulative Divergence')
-    df_long.rename(columns={'index': 'Step'}, inplace=True)
+    # Flatten multi-index
+    df_mean = step_divergence.xs('mean', level=1, axis=1)
+    df_sem = step_divergence.xs('sem', level=1, axis=1)
+    df_long_mean = df_mean.reset_index().melt(id_vars='article', var_name='Step', value_name='Divergence')
+    df_sem_long = df_sem.reset_index().melt(id_vars='article', var_name='Step', value_name='Error')
+    df_combined = pd.merge(df_long_mean, df_sem_long, on=['article', 'Step'])
 
-    # Plot using Plotly Express
-    fig = px.line(df_long, x='Step', y='Cumulative Divergence', color='Article', markers=True,
-                title="Stepwise Divergence from random path", color_discrete_map=color_dict)
-    fig.add_hline(y=0, line=dict(color='black', dash='dash' ),  
-                annotation_text="Random path", annotation_position="bottom right",  
-                annotation_font=dict(size=12, color="black")  
-    )
+    fig = go.Figure()
+    '''
+    fig = px.line(df_combined, x='Step', y='Divergence', color='article', markers=True, 
+                    color_discrete_map=color_dict, error_y='Error')
+    '''
+
+    # Add horizontal line for random path
+    fig.add_hline(y=0, line=dict(color='black', dash='dash'),
+                annotation_text="Random Path", annotation_position="bottom right",
+                annotation_font=dict(size=12, color="black"))
+
+    for article in df_combined['article'].unique():
+
+        article_data = df_combined[df_combined['article'] == article].reset_index(drop=True)
+        x = article_data['Step'].to_list()
+        y = article_data['Divergence']
+        upper_bound = y + article_data['Error']
+        lower_bound = y - article_data['Error']
+
+        fig.add_trace(go.Scatter(
+            x=x, y=y, name=article,
+            line_color=color_dict[article]
+        ))
+
+        fig.add_traces(go.Scatter(
+            x=x+x[::-1], # x, then x reversed
+            y=upper_bound.to_list()+lower_bound.to_list()[::-1], # upper, then lower reversed
+            fill='toself',
+            fillcolor=hex_to_rgba(color_dict[article]),
+            line=dict(color='rgba(255,255,255,0)'),
+            hoverinfo="skip",
+            showlegend=False
+        ))
 
     fig.update_layout(
         xaxis=dict(
-            range=[df_long['Step'].min() - 0.5, df_long['Step'].max() + 0.5],
+            range=[df_long_mean['Step'].min() - 0.5, df_long_mean['Step'].max() + 0.5],
             title='Step',
             tickmode='linear'  # Ensures all integer ticks are shown
         ),
-        yaxis=dict(title='Value'),
+        yaxis=dict(title='Divergence Value'),
         width=800,  # Set the width of the plot
-        height=600  # Set the height of the plot
+        height=600, # Set the height of the plot
+        title=dict(text="Stepwise Divergence from Random Path")
     )
 
     fig.show()
 
-def plot_category_step_divergence(step_divergence, df_categories_filtered, color_dict):
+def plot_category_step_divergence(step_divergence, color_dict):
     """
     Plots the stepwise deviation from a random path for different categories.
     Parameters:
     step_divergence (pd.DataFrame): DataFrame containing the stepwise divergence values for each article.
-    df_categories_filtered (pd.DataFrame): DataFrame containing the article categories with at least 'article' and 'level_1' columns.
+    df_categories (pd.DataFrame): DataFrame containing the article categories with at least 'article' and 'level_1' columns.
     color_dict (dict): Dictionary mapping category names to colors for the plot.
     Returns:
     None: Displays an interactive plotly line plot with markers.
     """
     
 
-    #get level 1 categories for each articles
-    cat_mean_div = step_divergence.transpose().reset_index()
-    cat_mean_div = cat_mean_div.merge(right=df_categories_filtered[['article', 'level_1']], on='article', how='left')
+    # Flatten multi-index
+    df_mean = step_divergence.xs('mean', level=1, axis=1)
+    df_sem = step_divergence.xs('sem', level=1, axis=1)
+    df_long_mean = df_mean.reset_index().melt(id_vars='level_1', var_name='Step', value_name='Divergence')
+    df_sem_long = df_sem.reset_index().melt(id_vars='level_1', var_name='Step', value_name='Error')
+    df_combined = pd.merge(df_long_mean, df_sem_long, on=['level_1', 'Step'])
 
-    #sum probabilities of articles of the same category 
-    cat_mean_div = cat_mean_div.groupby('level_1').agg('sum').reset_index().drop(columns='article')
+    fig = go.Figure()
 
-    df_long_cat = cat_mean_div.melt(id_vars=['level_1'], var_name='Step', value_name='Value')
+    # Add horizontal line for random path
+    fig.add_hline(y=0, line=dict(color='black', dash='dash'),
+                annotation_text="Random Path", annotation_position="bottom right",
+                annotation_font=dict(size=12, color="black"))
 
-    # Convert the 'Step' column to start from 1
-    df_long_cat['Step'] = df_long_cat['Step'].astype(int) + 1
+    for cat in df_combined['level_1'].unique():
 
-    # Plot the data as a scatter plot with lines
-    fig = px.line(
-        df_long_cat,
-        x='Step',
-        y='Value',
-        color='level_1',
-        title='Stepwise deviation from random path, per category',
-        color_discrete_map=color_dict,
-        markers=True
-    )
+        article_data = df_combined[df_combined['level_1'] == cat].reset_index(drop=True)
+        x = article_data['Step'].to_list()
+        y = article_data['Divergence']
+        upper_bound = y + article_data['Error']
+        lower_bound = y - article_data['Error']
 
-    # Add a horizontal line at y=0
-    fig.add_hline(
-        y=0,
-        line=dict(color='black', dash='dash'),
-        annotation_text="Random path",
-        annotation_position="top right",
-        annotation_font=dict(size=12, color="black")
-    )
+        fig.add_trace(go.Scatter(
+            x=x, y=y, name=cat,
+            line_color=color_dict[cat]
+        ))
 
-    # Adjust x-axis to add white space before and after the steps
+        fig.add_traces(go.Scatter(
+            x=x+x[::-1], # x, then x reversed
+            y=upper_bound.to_list()+lower_bound.to_list()[::-1], # upper, then lower reversed
+            fill='toself',
+            fillcolor=hex_to_rgba(color_dict[cat]),
+            line=dict(color='rgba(255,255,255,0)'),
+            hoverinfo="skip",
+            showlegend=False
+        ))
+
     fig.update_layout(
         xaxis=dict(
-            range=[df_long_cat['Step'].min() - 0.5, df_long_cat['Step'].max() + 0.5],
+            range=[df_long_mean['Step'].min() - 0.5, df_long_mean['Step'].max() + 0.5],
             title='Step',
             tickmode='linear'  # Ensures all integer ticks are shown
         ),
-        yaxis=dict(title='Value'),
+        yaxis=dict(title='Divergence Value'),
         width=800,  # Set the width of the plot
-        height=600  # Set the height of the plot
+        height=600, # Set the height of the plot
+        title=dict(text="Stepwise Divergence from Random Path")
     )
 
     fig.show()
+
+
+def markov_example(parser, user_transitions):
+    """
+    Generates and visualizes Markov transition probabilities and compares them with user transition data.
+    Parameters:
+    parser (object): An object used to parse the transition probabilities.
+    user_transitions (pd.DataFrame): A DataFrame containing user transition data.
+    This function performs the following steps:
+    1. Generates transition probabilities for a set of example articles using the provided parser.
+    2. Visualizes the transition probabilities as a heatmap.
+    3. Computes the steady-state distribution of the transition matrix.
+    4. Compares the Markov transition probabilities with user transition data for a subset of articles.
+    5. Visualizes the Markov transition probabilities, user transition probabilities, and their differences as heatmaps.
+    The function displays the heatmaps using matplotlib and seaborn.
+    """
+
+
+    example_articles = pd.Series(['United States', 'France', 'Agriculture', 'Mexico', 'Natural gas'])
+
+    tp = get_transition_probabilities(example_articles, parser, backclicks=True)
+
+    plt.figure(figsize=(8, 6))
+    sn.heatmap(np.linalg.matrix_power(tp, 1), cmap='BuPu', annot=True, fmt=".2f", cbar=True)
+
+    plt.xticks(np.arange(6) + 0.5, ['<'] + example_articles.to_list(), rotation=0)  # Keep x-ticks horizontal
+    plt.yticks(np.arange(6) + 0.5, ['<'] + example_articles.to_list(), rotation=0)  # Make y-ticks horizontal
+
+    plt.tight_layout()
+    plt.show()
+
+    eigval, eigvec = np.linalg.eig(tp.T)
+    steady_state = eigvec[:, 0] / np.sum(eigvec[:, 0])
+    assert np.isclose(steady_state @ tp, steady_state) # testing if the vector is really a left eigenvector with eigenvalue 1
+
+    example_articles = pd.Series(['United States', 'France', 'Agriculture', 'Mexico'])
+    markov_example = get_transition_probabilities(example_articles, parser, backclicks=False)
+    user_example = row_normalise(user_transitions[example_articles].loc[example_articles])
+    diff_example = user_example-markov_example
+
+    plt.figure(figsize=(15, 4))
+
+    plt.subplot(131)
+    sn.heatmap(markov_example, cmap='BuPu', annot=True, fmt=".2f", cbar=True, vmin=0, vmax=1)
+    plt.xticks(np.arange(4) + 0.5, example_articles.to_list(), rotation=0)  # Keep x-ticks horizontal
+    plt.yticks(np.arange(4) + 0.5, example_articles.to_list(), rotation=0)  # Make y-ticks horizontal
+    plt.title('Markov Transition')
+
+    plt.subplot(132)
+    sn.heatmap(user_example, cmap='BuPu', annot=True, fmt=".2f", cbar=True, vmin=0, vmax=1)
+    plt.xticks(np.arange(4) + 0.5, example_articles.to_list(), rotation=0)  # Keep x-ticks horizontal
+    plt.yticks(np.arange(4) + 0.5, example_articles.to_list(), rotation=0)  # Make y-ticks horizontal
+    plt.title('User Transition')
+
+    plt.subplot(133)
+    sn.heatmap(diff_example, cmap='vlag', annot=True, fmt=".2f", cbar=True, vmin=-1, vmax=1)
+    plt.xticks(np.arange(4) + 0.5, example_articles.to_list(), rotation=0)  # Keep x-ticks horizontal
+    plt.yticks(np.arange(4) + 0.5, example_articles.to_list(), rotation=0)  # Make y-ticks horizontal
+    plt.title('Difference')
+
+    plt.tight_layout()
+    plt.show()
