@@ -27,10 +27,7 @@ def create_treemap_data(df, show_articles=True):
 
     # Replace None with empty strings to simplify checks
     df = df.fillna('')
-    labels = []
-    ids = []
-    parents = []
-    values = []
+    labels, ids, parents, values, colors = [], [], [], [], []
 
     # Dictionary to quickly find parent IDs at different levels
     node_ids = {}
@@ -131,6 +128,59 @@ def create_treemap_data(df, show_articles=True):
 
     return labels, parents, values, ids
 
+import plotly.graph_objects as go
+
+def create_colored_treemap(labels, parents, values, ids, color_palette, title="Treemap"):
+    """
+    Creates a Plotly Treemap with colors propagated from level_1 to all children.
+
+    Parameters:
+    - labels (list): List of node labels.
+    - parents (list): List of parent nodes.
+    - values (list): List of values (used for proportional sizing).
+    - ids (list): List of unique node IDs.
+    - color_palette (dict): Dictionary mapping level_1 labels to colors.
+    - title (str): Title of the treemap.
+
+    Returns:
+    - fig (plotly.graph_objects.Figure): A Plotly Treemap figure.
+    """
+
+    # Function to propagate level_1 color to all children
+    def get_colors_for_hierarchy(ids, color_palette):
+        colors = []
+        for tag in ids:
+            # Extract the level_1 part of the label (before any slash '/')
+            level_1 = tag.split('/')[0]
+            # Get the color for level_1; default to light gray if not found
+            color = color_palette.get(level_1, '#d3d3d3')
+            colors.append(color)
+        return colors
+
+    # Generate colors for the hierarchy
+    colors = get_colors_for_hierarchy(ids, color_palette)
+
+    # Create the Treemap
+    fig = go.Figure(go.Treemap(
+        labels=labels,
+        parents=parents,
+        values=values,
+        ids=ids,
+        marker=dict(colors=colors),  # Apply the propagated colors
+        textfont=dict(size=18),
+        branchvalues='total'  # Ensures proportional sizing by summation of children
+    ))
+
+    # Update the layout
+    fig.update_layout(
+        margin=dict(t=50, l=10, r=10, b=5),
+        title=title
+    )
+    fig.show()
+
+    return fig
+
+
 def assign_world_region_categories(df_categories, world_region_categories):
     """
     Processes a DataFrame to standardize and categorize subject categories, 
@@ -174,40 +224,6 @@ def assign_world_region_categories(df_categories, world_region_categories):
         axis=1
     ).to_list()
 
-    return df_categories_filtered
-
-def voyages_categories(df_categories_filtered, voyage_categories):
-    """
-    Processes a DataFrame to standardize and categorize subject categories, 
-    specifically handling those related to 'Voyages'.
-
-    Steps:
-    1. Strips the prefix 'subject.' from values in the 'category' column if it exists.
-    2. Replaces categories containing any string from `voyage_categories` with 'Voyages'.
-    3. Updates rows where 'category' is 'Voyages':
-       - Sets 'level_1' to 'Voyages'.
-       - Sets 'level_2' and 'level_3' to None.
-
-    Parameters:
-    ----------
-    df_categories_filtered : pandas.DataFrame
-        A DataFrame containing a 'category' column and hierarchical columns 
-        ('level_1', 'level_2', 'level_3') to represent category levels.
-
-    Returns:
-    -------
-    pandas.DataFrame
-        The updated DataFrame with processed categories and hierarchy levels.
-    """
-    df_categories_filtered['category'] = df_categories_filtered['category'].apply(
-        lambda category: category.split('subject.', 1)[-1] if 'subject.' in category else category
-    )
-    df_categories_filtered['category'] = [
-        'Voyages' if any(voyage in category for voyage in voyage_categories) else category
-        for category in df_categories_filtered['category']
-    ]
-    # Updating level_1, level_2, and level_3 based on 'Voyages' in 'category'
-    df_categories_filtered.loc[df_categories_filtered['category'] == 'Voyages', ['level_1', 'level_2', 'level_3']] = ['Voyages', None, None]
     return df_categories_filtered
 
 def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_level=True, finished=True):
@@ -1059,8 +1075,8 @@ def plot_sankey_voyage(df, background_color='transparent'):
     )
 
     fig.show()
-    #return fig
-    return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
+    
+    return fig
 
 def plot_articles_pie_chart(df, palette, abbreviations=None):
     """
@@ -1072,8 +1088,6 @@ def plot_articles_pie_chart(df, palette, abbreviations=None):
     """
     # Group by Level 1 category and count the number of articles
     category_counts = df['level_1'].value_counts()
-
-    # Sort the categories by the article count in ascending order
     category_counts = category_counts.sort_values(ascending=True)
 
     # Handle small categories (less than 3%) by grouping them as 'Others'
@@ -1103,7 +1117,7 @@ def plot_articles_pie_chart(df, palette, abbreviations=None):
         autopct='%1.1f%%', 
         startangle=90,
         pctdistance=0.8,
-        colors=[palette[label] for label in large_categories.index],
+        colors = [palette.get(label, '#cccccc') for label in large_categories.index]
     )
 
     # Customize the font and color of the numbers

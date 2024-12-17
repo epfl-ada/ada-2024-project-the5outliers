@@ -1,30 +1,67 @@
 from FlagEmbedding import BGEM3FlagModel
-from gensim.models import KeyedVectors
 import numpy as np
 import networkx as nx
 import os
 import pandas as pd
 from tqdm import tqdm
+from transformers import BertTokenizer, BertModel
+import torch
 
+def compute_save_all():
+    '''Call this function from the base of the repo. Computes article embeddings, the two similarity matrices and the articles parsed and saves them to data.'''
+    from src.data.data_loader import read_articles , read_categories
+    from src.utils.HTMLParser import HTMLParser
 
-def gensim_embedding(df):
-    '''Gensim word2vec from article names: does not work for all articles because takes precise keys as input'''
+    df_article_names = read_articles()
 
-    # Load pretrained model
-    word2vec = KeyedVectors.load_word2vec_format(r'./data/GoogleNews-vectors-negative300.bin', binary=True)
+    flag_embeddings = BGEM3_embedding(df_article_names)
+    flag_similarity_matrix = compute_embedding_similarity_matrix(flag_embeddings)
+    bert_embeddings = bert_embedding(df_article_names)
+    bert_similarity_matrix = compute_embedding_similarity_matrix(bert_embeddings)
 
-    article_embeddings = np.zeros((len(df), 3000))
+    df_categories = read_categories()
+    df_scat = category_jaccard_similarity(df_categories,{'level_1': 1, 'level_2': 2, 'level_3': 3}) 
+    df_scat = df_scat.loc[df_article_names, df_article_names]
+    df_scat = df_scat.astype(np.float32)
 
-    for n in range(len(df)):
-        article_embeddings[n] = word2vec(df[n])
+    parser = HTMLParser()
+    parser.parse_save_valid(df_article_names) # saves to pickle file
 
-    return article_embeddings
+    np.save('./data/paths-and-graph/embedded_articles_BGEM3.npy', flag_embeddings)
+    np.save('./data/paths-and-graph/similarity_matrix_BGEM3.npy', flag_similarity_matrix)
+    np.save('./data/paths-and-graph/embedded_articles_bert.npy', bert_embeddings)
+    np.save('./data/paths-and-graph/similarity_matrix_bert.npy', bert_similarity_matrix)
+    np.save('./data/paths-and-graph/category_jaccard_similarity.npy', df_scat)
 
-def BGEM3_embedding(df):
+def bert_embedding(df_article_names):
+    '''Generate embeddings for article names using Bert'''
+
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    model = BertModel.from_pretrained('bert-base-uncased')
+
+    embeddings = []
+    for art in tqdm(df_article_names):
+        # Tokenize the word (add special tokens for BERT)
+        input_ids = tokenizer(art, return_tensors='pt')['input_ids']
+
+        # Pass through the BERT model
+        with torch.no_grad():
+            outputs = model(input_ids)
+
+        # Extract the embeddings for the [CLS] token (index 0)
+        word_embedding = outputs.last_hidden_state[0][0].numpy()
+        embeddings.append(word_embedding)
+
+    embeddings = np.array(embeddings)
+    embeddings /= np.linalg.norm(embeddings, axis=1)[:, np.newaxis]
+
+    return embeddings
+
+def BGEM3_embedding(df_article_names):
     '''BGEM3 embedding from article names: run in colab for speed'''
 
     emb_model = BGEM3FlagModel('BAAI/bge-m3', use_fp16=False) # using fp32 for better precision
-    embeddings = emb_model.encode(df.tolist())['dense_vecs']
+    embeddings = emb_model.encode(df_article_names.tolist())['dense_vecs']
 
     return embeddings
 
@@ -32,15 +69,6 @@ def compute_embedding_similarity_matrix(embeddings):
     '''Computes the cosine similarity of embeddings. Embeddings are already normalised to 1, so the similarity is the dot product'''
     
     return np.matmul(embeddings, embeddings.T)
-
-def load_embedding_similarity_matrix():
-    '''Assumes the embedding and similarity matrix exist and are in ./data/paths-and-graph starting from the base of the repo'''
-
-    data_path = './data/paths-and-graph'
-    embeddings = np.load(os.path.join(data_path, 'embedded_articles.npy'))
-    similarity_matrix = np.load(os.path.join(data_path, 'similarity_matrix.npy'))
-
-    return embeddings, similarity_matrix
 
 def get_indices(df_articles, article_names):
     '''
@@ -149,25 +177,3 @@ def category_jaccard_similarity(categories, level_weights):
     )
 
     return similarity_weighted_jaccard_df  
-
-def compute_save_all():
-    '''Call this function from the base of the repo. Computes article embeddings, the two similarity matrices and the articles parsed and saves them to data.'''
-    from src.data.data_loader import read_articles , read_categories
-    from src.utils.HTMLParser import HTMLParser
-
-    df_article_names = read_articles()
-
-    embeddings = BGEM3_embedding(df_article_names)
-    similarity_matrix = compute_embedding_similarity_matrix(embeddings)
-
-    df_categories = read_categories()
-    df_scat = category_jaccard_similarity(df_categories,{'level_1': 1, 'level_2': 2, 'level_3': 3}) 
-    df_scat = df_scat.loc[df_article_names, df_article_names]
-    df_scat = df_scat.astype(np.float32)
-
-    parser = HTMLParser()
-    parser.parse_save_valid(df_article_names) # saves to pickle file
-
-    np.save('./data/paths-and-graph/embedded_articles.npy', embeddings)
-    np.save('./data/paths-and-graph/similarity_matrix.npy', similarity_matrix)
-    np.save('./data/paths-and-graph/category_jaccard_similarity.npy', df_scat)
