@@ -10,61 +10,124 @@ import seaborn as sn
 import networkx as nx
 from tqdm import tqdm
 
-def create_treemap_data(df):
+def create_treemap_data(df, show_articles=True):
     """
-    Processes the DataFrame Categories to generate labels, parents, values, and ids for the treemap.
+    Processes the DataFrame to generate labels, parents, values, and ids for a treemap.
+    Hierarchy:
+    level_1 -> level_2 (if present) -> level_3 (if present) -> article (if show_articles=True)
+
+    If level_2 is missing for an article, it is placed directly under level_1.
+    If level_3 is missing for an article but level_2 is present, it is placed directly under (level_1, level_2).
+    Otherwise, if level_3 is present, articles go under (level_1, level_2, level_3).
+
+    Parameters:
+    - df (DataFrame): Must contain columns 'level_1', 'level_2', 'level_3', 'article'.
+    - show_articles (bool): Whether to include articles as leaves in the treemap. Default is True.
     """
+
+    # Replace None with empty strings to simplify checks
+    df = df.fillna('')
     labels = []
     ids = []
     parents = []
     values = []
 
-    # Create a dictionary to keep track of node IDs
+    # Dictionary to quickly find parent IDs at different levels
     node_ids = {}
 
-    # Get counts at each level
-    counts_level_1 = df.groupby('level_1').size().reset_index(name='count')
-    counts_level_2 = df.groupby(['level_1', 'level_2']).size().reset_index(name='count')
-    counts_level_3 = df.groupby(['level_1', 'level_2', 'level_3']).size().reset_index(name='count')
+    # Count how many rows (articles) at each level
+    counts_level_1 = df.groupby(['level_1']).size().reset_index(name='count')
+    # Only create level_2 nodes for those actually having a non-empty level_2
+    counts_level_2 = df[df['level_2'] != ''].groupby(['level_1', 'level_2']).size().reset_index(name='count')
+    # Only create level_3 nodes for those actually having a non-empty level_3
+    counts_level_3 = df[(df['level_2'] != '') & (df['level_3'] != '')].groupby(['level_1', 'level_2', 'level_3']).size().reset_index(name='count')
 
-    # Process level 1 nodes
+    # For articles, split into three categories based on their lowest level
+    articles_level_1 = df[(df['level_2'] == '')].groupby(['level_1', 'article']).size().reset_index(name='count')
+    articles_level_2 = df[(df['level_2'] != '') & (df['level_3'] == '')].groupby(['level_1', 'level_2', 'article']).size().reset_index(name='count')
+    articles_level_3 = df[(df['level_2'] != '') & (df['level_3'] != '')].groupby(['level_1', 'level_2', 'level_3', 'article']).size().reset_index(name='count')
+
+    # -------------------- Create Level 1 Nodes --------------------
     for _, row in counts_level_1.iterrows():
         level_1 = row['level_1']
         label = level_1
-        id = level_1
-        parent_id = ''
+        _id = level_1
+        parent_id = ''  # top-level node
         labels.append(label)
-        ids.append(id)
+        ids.append(_id)
         parents.append(parent_id)
         values.append(row['count'])
-        node_ids[(level_1,)] = id
+        node_ids[(level_1,)] = _id
 
-    # Process level 2 nodes
+    # -------------------- Create Level 2 Nodes --------------------
     for _, row in counts_level_2.iterrows():
         level_1 = row['level_1']
         level_2 = row['level_2']
-        label = level_2
-        id = f"{level_1}/{level_2}"
-        parent_id = level_1
-        labels.append(label)
-        ids.append(id)
-        parents.append(parent_id)
-        values.append(row['count'])
-        node_ids[(level_1, level_2)] = id
+        if level_2 != '':
+            label = level_2
+            _id = f"{level_1}/{level_2}"
+            parent_id = node_ids.get((level_1,), level_1)
+            labels.append(label)
+            ids.append(_id)
+            parents.append(parent_id)
+            values.append(row['count'])
+            node_ids[(level_1, level_2)] = _id
 
-    # Process level 3 nodes
+    # -------------------- Create Level 3 Nodes --------------------
     for _, row in counts_level_3.iterrows():
         level_1 = row['level_1']
         level_2 = row['level_2']
         level_3 = row['level_3']
-        label = level_3
-        id = f"{level_1}/{level_2}/{level_3}"
-        parent_id = f"{level_1}/{level_2}"
-        labels.append(label)
-        ids.append(id)
-        parents.append(parent_id)
-        values.append(row['count'])
-        node_ids[(level_1, level_2, level_3)] = id
+        if level_3 != '':
+            label = level_3
+            _id = f"{level_1}/{level_2}/{level_3}"
+            parent_id = node_ids.get((level_1, level_2), f"{level_1}/{level_2}")
+            labels.append(label)
+            ids.append(_id)
+            parents.append(parent_id)
+            values.append(row['count'])
+            node_ids[(level_1, level_2, level_3)] = _id
+
+    # -------------------- Create Article Nodes (if show_articles) --------------------
+    if show_articles:
+        # Articles directly under level_1 (no level_2)
+        for _, row in articles_level_1.iterrows():
+            level_1 = row['level_1']
+            article = row['article']
+            label = article
+            _id = f"{level_1}/{article}"
+            parent_id = node_ids.get((level_1,), level_1)
+            labels.append(label)
+            ids.append(_id)
+            parents.append(parent_id)
+            values.append(row['count'])
+
+        # Articles under (level_1, level_2) but no level_3
+        for _, row in articles_level_2.iterrows():
+            level_1 = row['level_1']
+            level_2 = row['level_2']
+            article = row['article']
+            label = article
+            _id = f"{level_1}/{level_2}/{article}"
+            parent_id = node_ids.get((level_1, level_2), f"{level_1}/{level_2}")
+            labels.append(label)
+            ids.append(_id)
+            parents.append(parent_id)
+            values.append(row['count'])
+
+        # Articles under (level_1, level_2, level_3)
+        for _, row in articles_level_3.iterrows():
+            level_1 = row['level_1']
+            level_2 = row['level_2']
+            level_3 = row['level_3']
+            article = row['article']
+            label = article
+            _id = f"{level_1}/{level_2}/{level_3}/{article}"
+            parent_id = node_ids.get((level_1, level_2, level_3), f"{level_1}/{level_2}/{level_3}")
+            labels.append(label)
+            ids.append(_id)
+            parents.append(parent_id)
+            values.append(row['count'])
 
     return labels, parents, values, ids
 
@@ -819,121 +882,6 @@ def plot_sankey_voyage(df, background_color='transparent'):
     fig.show()
     #return fig
     return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
-
-def plot_cooccurrence_cat_matrix(df_categories, abbreviations=None):
-    """
-    Plots a co-occurrence matrix using abbreviations for category labels in the heatmap.
-    
-    Parameters:
-    - df_categories (DataFrame): The DataFrame with 'article' and 'level_1' columns.
-    - abbreviations (dict, optional): A dictionary mapping full category names to abbreviations.
-    """
-    # Get the unique categories from the DataFrame
-    categories_full = df_categories['level_1'].unique()
-    
-    # If abbreviations are provided, map the full category names to abbreviations
-    if abbreviations:
-        categories_abbr = [abbreviations.get(cat, cat) for cat in categories_full]
-    else:
-        categories_abbr = categories_full
-
-    # Group by article and collect unique level_1 categories for each article
-    article_combinations = (
-        df_categories.groupby("article")["level_1"]
-        .apply(lambda x: tuple(sorted(x.unique())))  # Sort and get unique level_1 values as a tuple
-    )
-    combination_counts = article_combinations.value_counts()
-
-    # Create a co-occurrence matrix using abbreviations for the plot
-    matrix = pd.DataFrame(0, index=categories_abbr, columns=categories_abbr)
-
-    # Fill the matrix with co-occurrence counts
-    for comb, count in zip(combination_counts.index, combination_counts):
-        for i in comb:
-            for j in comb:
-                matrix.loc[abbreviations.get(i, i), abbreviations.get(j, j)] += count
-
-    # Calculate the total articles for each category using the diagonal
-    total_articles = pd.Series(np.diag(matrix), index=categories_abbr)
-
-    # Mask for the upper triangle excluding the diagonal
-    mask = np.triu(np.ones_like(matrix, dtype=bool), k=1) | (matrix == 0)
-
-    # Plot the co-occurrence matrix
-
-    # Set up the color map for masked cells
-    cmap = sn.color_palette("YlGnBu", as_cmap=True)
-    cmap.set_bad(color='white')  # Set masked cells to appear white
-
-    plt.figure(figsize=(10, 8))
-    sn.heatmap(
-        matrix,
-        annot=True,
-        fmt="g",
-        cmap=cmap,
-        cbar_kws={'label': 'Number of Co-occurrences'},
-        mask=mask,
-        linewidths=0.5
-    )
-
-    # Annotate each off-diagonal cell in the upper triangle to suggest a main category
-    for i, cat1 in enumerate(categories_abbr):
-        for j, cat2 in enumerate(categories_abbr):
-            if i < j and matrix.loc[cat1, cat2] > 0:  # Only upper triangle and non-zero cells
-                # Determine which category has fewer total articles
-                if total_articles[cat1] < total_articles[cat2]:
-                    main_category = cat1
-                else:
-                    main_category = cat2
-                
-                # Annotate the cell with the suggested main category
-                plt.text(
-                    j + 0.5, i + 0.5,
-                    f"{main_category}",
-                    ha='center', va='center', color="red", fontsize=8, fontweight='bold'
-                )
-
-    # Customize labels and layout
-    plt.title("Co-occurrence of Level 1 Categories in Articles with Main Category Suggestion")
-    plt.xlabel("Level 1 Category")
-    plt.ylabel("Level 1 Category")
-    plt.xticks(rotation=0, fontsize=10)
-    plt.yticks(fontsize=10, rotation=0)
-
-    # Add an enhanced legend for abbreviations
-    if abbreviations:
-        legend_labels = [f"{abbr} = {name}" for name, abbr in abbreviations.items()]
-        plt.figtext(0.98, 0.5, "\n".join(legend_labels), ha="left", fontsize=10, bbox=dict(
-            facecolor="lightgrey", edgecolor="black", boxstyle="round,pad=0.5", linewidth=1))
-
-    plt.tight_layout()
-    plt.show()
-
-def matrix_common_paths(data):  
-    # Extract transitions and create transition counts
-    transitions = {}
-    for _, row in data.iterrows():
-        path = row['Category Path'].split(" -> ")
-        count = row['Count']
-        for i in range(len(path) - 1):
-            from_cat = path[i]
-            to_cat = path[i + 1]
-            if from_cat not in transitions:
-                transitions[from_cat] = {}
-            if to_cat not in transitions[from_cat]:
-                transitions[from_cat][to_cat] = 0
-            transitions[from_cat][to_cat] += count
-
-    # Create transition matrix DataFrame
-    categories = sorted(set([key for key in transitions] + [k for subdict in transitions.values() for k in subdict]))
-    transition_matrix = pd.DataFrame(0, index=categories, columns=categories)
-
-    # Populate the transition matrix with counts
-    for from_cat, to_cats in transitions.items():
-        for to_cat, count in to_cats.items():
-            transition_matrix.at[from_cat, to_cat] = count
-    
-    return transition_matrix
 
 def plot_articles_pie_chart(df, palette, abbreviations=None):
     """
