@@ -6,9 +6,7 @@ import matplotlib.patches as mpatches
 import plotly.graph_objects as go
 import math
 
-
-
-def build_network(df_paths, df_categories, include_self_loops=True):
+def build_network_from_paths(df_paths, df_categories, include_self_loops=True):
     """
     Build a directed network graph from paths with main categories and edge weights.
     """
@@ -33,6 +31,40 @@ def build_network(df_paths, df_categories, include_self_loops=True):
                     G[u][v]['weight'] += 1
                 else:
                     G.add_edge(u, v, weight=1)
+
+    return G
+
+def build_network_from_matrix(matrix_df, article_to_category, include_self_loops=False):
+    """
+    Build a directed network graph from a transition matrix, with nodes mapped to main categories.
+
+    Parameters:
+    - matrix_df (DataFrame): A square DataFrame where rows = source, columns = target, values = weights.
+    - article_to_category (dict): Mapping of articles to their main categories.
+    - include_self_loops (bool): Whether to include self-loops (source == target).
+
+    Returns:
+    - G (networkx.DiGraph): A directed graph with edges and weights.
+    """
+    # Initialize directed graph
+    G = nx.DiGraph()
+
+    # Iterate over the transition matrix
+    for source_article in matrix_df.index:
+        for target_article in matrix_df.columns:
+            weight = matrix_df.at[source_article, target_article]
+            if weight > 0:  # Only consider non-zero transitions
+                # Map source and target articles to their main categories
+                source_category = article_to_category.get(source_article, source_article)
+                target_category = article_to_category.get(target_article, target_article)
+
+                # Handle self-loops based on the flag
+                if source_category != target_category or include_self_loops:
+                    # Add or update edge with weight
+                    if G.has_edge(source_category, target_category):
+                        G[source_category][target_category]['weight'] += weight
+                    else:
+                        G.add_edge(source_category, target_category, weight=weight)
 
     return G
 

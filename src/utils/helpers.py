@@ -27,10 +27,7 @@ def create_treemap_data(df, show_articles=True):
 
     # Replace None with empty strings to simplify checks
     df = df.fillna('')
-    labels = []
-    ids = []
-    parents = []
-    values = []
+    labels, ids, parents, values, colors = [], [], [], [], []
 
     # Dictionary to quickly find parent IDs at different levels
     node_ids = {}
@@ -130,6 +127,59 @@ def create_treemap_data(df, show_articles=True):
             values.append(row['count'])
 
     return labels, parents, values, ids
+
+import plotly.graph_objects as go
+
+def create_colored_treemap(labels, parents, values, ids, color_palette, title="Treemap"):
+    """
+    Creates a Plotly Treemap with colors propagated from level_1 to all children.
+
+    Parameters:
+    - labels (list): List of node labels.
+    - parents (list): List of parent nodes.
+    - values (list): List of values (used for proportional sizing).
+    - ids (list): List of unique node IDs.
+    - color_palette (dict): Dictionary mapping level_1 labels to colors.
+    - title (str): Title of the treemap.
+
+    Returns:
+    - fig (plotly.graph_objects.Figure): A Plotly Treemap figure.
+    """
+
+    # Function to propagate level_1 color to all children
+    def get_colors_for_hierarchy(ids, color_palette):
+        colors = []
+        for tag in ids:
+            # Extract the level_1 part of the label (before any slash '/')
+            level_1 = tag.split('/')[0]
+            # Get the color for level_1; default to light gray if not found
+            color = color_palette.get(level_1, '#d3d3d3')
+            colors.append(color)
+        return colors
+
+    # Generate colors for the hierarchy
+    colors = get_colors_for_hierarchy(ids, color_palette)
+
+    # Create the Treemap
+    fig = go.Figure(go.Treemap(
+        labels=labels,
+        parents=parents,
+        values=values,
+        ids=ids,
+        marker=dict(colors=colors),  # Apply the propagated colors
+        textfont=dict(size=18),
+        branchvalues='total'  # Ensures proportional sizing by summation of children
+    ))
+
+    # Update the layout
+    fig.update_layout(
+        margin=dict(t=50, l=10, r=10, b=5),
+        title=title
+    )
+    fig.show()
+
+    return fig
+
 
 def assign_world_region_categories(df_categories, world_region_categories):
     """
@@ -859,8 +909,6 @@ def plot_articles_pie_chart(df, palette, abbreviations=None):
     """
     # Group by Level 1 category and count the number of articles
     category_counts = df['level_1'].value_counts()
-
-    # Sort the categories by the article count in ascending order
     category_counts = category_counts.sort_values(ascending=True)
 
     # Handle small categories (less than 3%) by grouping them as 'Others'
@@ -890,7 +938,7 @@ def plot_articles_pie_chart(df, palette, abbreviations=None):
         autopct='%1.1f%%', 
         startangle=90,
         pctdistance=0.8,
-        colors=[palette[label] for label in large_categories.index],
+        colors = [palette.get(label, '#cccccc') for label in large_categories.index]
     )
 
     # Customize the font and color of the numbers
