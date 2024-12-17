@@ -304,13 +304,17 @@ def read_finished_paths():
     
     return df
 
-def read_similartiy_matrix():
+def read_similartiy_matrix(model='BGEM3'):
     '''
     Read the semantic similarity matrix, assuming it was computed only for valid articles.
-    Adds the article names as indices for the matrix
+    Adds the article names as indices for the matrix.
+
+    Parameters:
+    -----------
+        model: string. 'BGEM3' or 'bert'
     '''
 
-    filepath='./data/paths-and-graph/similarity_matrix.npy'
+    filepath=f'./data/paths-and-graph/similarity_matrix_{model}.npy'
     article_names = read_articles()
     sm = np.load(filepath)
     df_sm = pd.DataFrame(sm)

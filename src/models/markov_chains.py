@@ -170,14 +170,14 @@ def get_step_divergences(df_article_names, parser, df_paths, num_steps=10, df_ca
 
             group_means = pd.DataFrame()
             group_means['mean'] = KL_cat_n_df.groupby('level_1').apply(lambda group: group.iloc[:, :-1].values.mean())
-            group_means['sem'] = KL_cat_n_df.groupby('level_1').apply(lambda group: group.iloc[:, :-1].values.std() / np.sqrt(group.iloc[:, :-1].size))
+            group_means['sem'] = 1.96 * KL_cat_n_df.groupby('level_1').apply(lambda group: group.iloc[:, :-1].values.std() / np.sqrt(group.iloc[:, :-1].size))
 
             KL_stats_step.append(group_means)
         else:
             # Compute mean and standard deviation for KL divergence at this step.
             KL_stats_step.append({
                 "mean": KL_n_df.mean(axis=0),
-                "sem": KL_n_df.sem(axis=0)
+                "sem": 1.96 * KL_n_df.sem(axis=0)
             })
 
     # Convert KL stats to a DataFrame with MultiIndex columns (mean and std).
