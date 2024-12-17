@@ -176,40 +176,6 @@ def assign_world_region_categories(df_categories, world_region_categories):
 
     return df_categories_filtered
 
-def voyages_categories(df_categories_filtered, voyage_categories):
-    """
-    Processes a DataFrame to standardize and categorize subject categories, 
-    specifically handling those related to 'Voyages'.
-
-    Steps:
-    1. Strips the prefix 'subject.' from values in the 'category' column if it exists.
-    2. Replaces categories containing any string from `voyage_categories` with 'Voyages'.
-    3. Updates rows where 'category' is 'Voyages':
-       - Sets 'level_1' to 'Voyages'.
-       - Sets 'level_2' and 'level_3' to None.
-
-    Parameters:
-    ----------
-    df_categories_filtered : pandas.DataFrame
-        A DataFrame containing a 'category' column and hierarchical columns 
-        ('level_1', 'level_2', 'level_3') to represent category levels.
-
-    Returns:
-    -------
-    pandas.DataFrame
-        The updated DataFrame with processed categories and hierarchy levels.
-    """
-    df_categories_filtered['category'] = df_categories_filtered['category'].apply(
-        lambda category: category.split('subject.', 1)[-1] if 'subject.' in category else category
-    )
-    df_categories_filtered['category'] = [
-        'Voyages' if any(voyage in category for voyage in voyage_categories) else category
-        for category in df_categories_filtered['category']
-    ]
-    # Updating level_1, level_2, and level_3 based on 'Voyages' in 'category'
-    df_categories_filtered.loc[df_categories_filtered['category'] == 'Voyages', ['level_1', 'level_2', 'level_3']] = ['Voyages', None, None]
-    return df_categories_filtered
-
 def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_level=True, finished=True):
     """
     Give category paths from article paths and start-end categories.
@@ -880,8 +846,8 @@ def plot_sankey_voyage(df, background_color='transparent'):
     )
 
     fig.show()
-    #return fig
-    return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
+    
+    return fig
 
 def plot_articles_pie_chart(df, palette, abbreviations=None):
     """
