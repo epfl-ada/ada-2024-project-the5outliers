@@ -1,6 +1,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+import plotly.offline
 from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
 from collections import Counter
@@ -802,22 +803,22 @@ def plot_sankey_voyage(df, background_color='transparent'):
 
     # Create the Sankey diagram
     fig = go.Figure(data=[go.Sankey(
-        node=dict(pad=15, thickness=20, line=dict(color="black", width=0), label=labels, color=node_colors),
-        link=dict(source=sources, target=targets, value=values, color='rgba(60,60,60,0.3)')
+        node=dict(pad=20, thickness=20, line=dict(color="white", width=0), label=labels, color=node_colors),
+        link=dict(source=sources, target=targets, value=values, color=link_colors) #color='rgba(60,60,60,0.3)
     )])
-
+    
     fig.update_layout(
         title_text="Voyage and Non-Voyage Paths",
         font_size=10,
         title_font_size=14,
         title_x=0.5,
-        paper_bgcolor=paper_bgcolor,
-        plot_bgcolor=plot_bgcolor
+        paper_bgcolor=paper_bgcolor,  #remove to set bg white 
+        plot_bgcolor=plot_bgcolor   #remove to set bg white 
     )
 
     fig.show()
-    return fig
-   #return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
+    #return fig
+    return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
 
 def plot_cooccurrence_cat_matrix(df_categories, abbreviations=None):
     """
