@@ -1,6 +1,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+import plotly.offline
 from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
 from collections import Counter
@@ -9,63 +10,176 @@ import seaborn as sn
 import networkx as nx
 from tqdm import tqdm
 
-def create_treemap_data(df):
+def create_treemap_data(df, show_articles=True):
     """
-    Processes the DataFrame Categories to generate labels, parents, values, and ids for the treemap.
-    """
-    labels = []
-    ids = []
-    parents = []
-    values = []
+    Processes the DataFrame to generate labels, parents, values, and ids for a treemap.
+    Hierarchy:
+    level_1 -> level_2 (if present) -> level_3 (if present) -> article (if show_articles=True)
 
-    # Create a dictionary to keep track of node IDs
+    If level_2 is missing for an article, it is placed directly under level_1.
+    If level_3 is missing for an article but level_2 is present, it is placed directly under (level_1, level_2).
+    Otherwise, if level_3 is present, articles go under (level_1, level_2, level_3).
+
+    Parameters:
+    - df (DataFrame): Must contain columns 'level_1', 'level_2', 'level_3', 'article'.
+    - show_articles (bool): Whether to include articles as leaves in the treemap. Default is True.
+    """
+
+    # Replace None with empty strings to simplify checks
+    df = df.fillna('')
+    labels, ids, parents, values, colors = [], [], [], [], []
+
+    # Dictionary to quickly find parent IDs at different levels
     node_ids = {}
 
-    # Get counts at each level
-    counts_level_1 = df.groupby('level_1').size().reset_index(name='count')
-    counts_level_2 = df.groupby(['level_1', 'level_2']).size().reset_index(name='count')
-    counts_level_3 = df.groupby(['level_1', 'level_2', 'level_3']).size().reset_index(name='count')
+    # Count how many rows (articles) at each level
+    counts_level_1 = df.groupby(['level_1']).size().reset_index(name='count')
+    # Only create level_2 nodes for those actually having a non-empty level_2
+    counts_level_2 = df[df['level_2'] != ''].groupby(['level_1', 'level_2']).size().reset_index(name='count')
+    # Only create level_3 nodes for those actually having a non-empty level_3
+    counts_level_3 = df[(df['level_2'] != '') & (df['level_3'] != '')].groupby(['level_1', 'level_2', 'level_3']).size().reset_index(name='count')
 
-    # Process level 1 nodes
+    # For articles, split into three categories based on their lowest level
+    articles_level_1 = df[(df['level_2'] == '')].groupby(['level_1', 'article']).size().reset_index(name='count')
+    articles_level_2 = df[(df['level_2'] != '') & (df['level_3'] == '')].groupby(['level_1', 'level_2', 'article']).size().reset_index(name='count')
+    articles_level_3 = df[(df['level_2'] != '') & (df['level_3'] != '')].groupby(['level_1', 'level_2', 'level_3', 'article']).size().reset_index(name='count')
+
+    # -------------------- Create Level 1 Nodes --------------------
     for _, row in counts_level_1.iterrows():
         level_1 = row['level_1']
         label = level_1
-        id = level_1
-        parent_id = ''
+        _id = level_1
+        parent_id = ''  # top-level node
         labels.append(label)
-        ids.append(id)
+        ids.append(_id)
         parents.append(parent_id)
         values.append(row['count'])
-        node_ids[(level_1,)] = id
+        node_ids[(level_1,)] = _id
 
-    # Process level 2 nodes
+    # -------------------- Create Level 2 Nodes --------------------
     for _, row in counts_level_2.iterrows():
         level_1 = row['level_1']
         level_2 = row['level_2']
-        label = level_2
-        id = f"{level_1}/{level_2}"
-        parent_id = level_1
-        labels.append(label)
-        ids.append(id)
-        parents.append(parent_id)
-        values.append(row['count'])
-        node_ids[(level_1, level_2)] = id
+        if level_2 != '':
+            label = level_2
+            _id = f"{level_1}/{level_2}"
+            parent_id = node_ids.get((level_1,), level_1)
+            labels.append(label)
+            ids.append(_id)
+            parents.append(parent_id)
+            values.append(row['count'])
+            node_ids[(level_1, level_2)] = _id
 
-    # Process level 3 nodes
+    # -------------------- Create Level 3 Nodes --------------------
     for _, row in counts_level_3.iterrows():
         level_1 = row['level_1']
         level_2 = row['level_2']
         level_3 = row['level_3']
-        label = level_3
-        id = f"{level_1}/{level_2}/{level_3}"
-        parent_id = f"{level_1}/{level_2}"
-        labels.append(label)
-        ids.append(id)
-        parents.append(parent_id)
-        values.append(row['count'])
-        node_ids[(level_1, level_2, level_3)] = id
+        if level_3 != '':
+            label = level_3
+            _id = f"{level_1}/{level_2}/{level_3}"
+            parent_id = node_ids.get((level_1, level_2), f"{level_1}/{level_2}")
+            labels.append(label)
+            ids.append(_id)
+            parents.append(parent_id)
+            values.append(row['count'])
+            node_ids[(level_1, level_2, level_3)] = _id
+
+    # -------------------- Create Article Nodes (if show_articles) --------------------
+    if show_articles:
+        # Articles directly under level_1 (no level_2)
+        for _, row in articles_level_1.iterrows():
+            level_1 = row['level_1']
+            article = row['article']
+            label = article
+            _id = f"{level_1}/{article}"
+            parent_id = node_ids.get((level_1,), level_1)
+            labels.append(label)
+            ids.append(_id)
+            parents.append(parent_id)
+            values.append(row['count'])
+
+        # Articles under (level_1, level_2) but no level_3
+        for _, row in articles_level_2.iterrows():
+            level_1 = row['level_1']
+            level_2 = row['level_2']
+            article = row['article']
+            label = article
+            _id = f"{level_1}/{level_2}/{article}"
+            parent_id = node_ids.get((level_1, level_2), f"{level_1}/{level_2}")
+            labels.append(label)
+            ids.append(_id)
+            parents.append(parent_id)
+            values.append(row['count'])
+
+        # Articles under (level_1, level_2, level_3)
+        for _, row in articles_level_3.iterrows():
+            level_1 = row['level_1']
+            level_2 = row['level_2']
+            level_3 = row['level_3']
+            article = row['article']
+            label = article
+            _id = f"{level_1}/{level_2}/{level_3}/{article}"
+            parent_id = node_ids.get((level_1, level_2, level_3), f"{level_1}/{level_2}/{level_3}")
+            labels.append(label)
+            ids.append(_id)
+            parents.append(parent_id)
+            values.append(row['count'])
 
     return labels, parents, values, ids
+
+import plotly.graph_objects as go
+
+def create_colored_treemap(labels, parents, values, ids, color_palette, title="Treemap"):
+    """
+    Creates a Plotly Treemap with colors propagated from level_1 to all children.
+
+    Parameters:
+    - labels (list): List of node labels.
+    - parents (list): List of parent nodes.
+    - values (list): List of values (used for proportional sizing).
+    - ids (list): List of unique node IDs.
+    - color_palette (dict): Dictionary mapping level_1 labels to colors.
+    - title (str): Title of the treemap.
+
+    Returns:
+    - fig (plotly.graph_objects.Figure): A Plotly Treemap figure.
+    """
+
+    # Function to propagate level_1 color to all children
+    def get_colors_for_hierarchy(ids, color_palette):
+        colors = []
+        for tag in ids:
+            # Extract the level_1 part of the label (before any slash '/')
+            level_1 = tag.split('/')[0]
+            # Get the color for level_1; default to light gray if not found
+            color = color_palette.get(level_1, '#d3d3d3')
+            colors.append(color)
+        return colors
+
+    # Generate colors for the hierarchy
+    colors = get_colors_for_hierarchy(ids, color_palette)
+
+    # Create the Treemap
+    fig = go.Figure(go.Treemap(
+        labels=labels,
+        parents=parents,
+        values=values,
+        ids=ids,
+        marker=dict(colors=colors),  # Apply the propagated colors
+        textfont=dict(size=18),
+        branchvalues='total'  # Ensures proportional sizing by summation of children
+    ))
+
+    # Update the layout
+    fig.update_layout(
+        margin=dict(t=50, l=10, r=10, b=5),
+        title=title
+    )
+    fig.show()
+
+    return fig
+
 
 def assign_world_region_categories(df_categories, world_region_categories):
     """
@@ -110,40 +224,6 @@ def assign_world_region_categories(df_categories, world_region_categories):
         axis=1
     ).to_list()
 
-    return df_categories_filtered
-
-def voyages_categories(df_categories_filtered, voyage_categories):
-    """
-    Processes a DataFrame to standardize and categorize subject categories, 
-    specifically handling those related to 'Voyages'.
-
-    Steps:
-    1. Strips the prefix 'subject.' from values in the 'category' column if it exists.
-    2. Replaces categories containing any string from `voyage_categories` with 'Voyages'.
-    3. Updates rows where 'category' is 'Voyages':
-       - Sets 'level_1' to 'Voyages'.
-       - Sets 'level_2' and 'level_3' to None.
-
-    Parameters:
-    ----------
-    df_categories_filtered : pandas.DataFrame
-        A DataFrame containing a 'category' column and hierarchical columns 
-        ('level_1', 'level_2', 'level_3') to represent category levels.
-
-    Returns:
-    -------
-    pandas.DataFrame
-        The updated DataFrame with processed categories and hierarchy levels.
-    """
-    df_categories_filtered['category'] = df_categories_filtered['category'].apply(
-        lambda category: category.split('subject.', 1)[-1] if 'subject.' in category else category
-    )
-    df_categories_filtered['category'] = [
-        'Voyages' if any(voyage in category for voyage in voyage_categories) else category
-        for category in df_categories_filtered['category']
-    ]
-    # Updating level_1, level_2, and level_3 based on 'Voyages' in 'category'
-    df_categories_filtered.loc[df_categories_filtered['category'] == 'Voyages', ['level_1', 'level_2', 'level_3']] = ['Voyages', None, None]
     return df_categories_filtered
 
 def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_level=True, finished=True):
@@ -802,137 +882,22 @@ def plot_sankey_voyage(df, background_color='transparent'):
 
     # Create the Sankey diagram
     fig = go.Figure(data=[go.Sankey(
-        node=dict(pad=15, thickness=20, line=dict(color="black", width=0), label=labels, color=node_colors),
-        link=dict(source=sources, target=targets, value=values, color='rgba(60,60,60,0.3)')
+        node=dict(pad=20, thickness=20, line=dict(color="white", width=0), label=labels, color=node_colors),
+        link=dict(source=sources, target=targets, value=values, color=link_colors) #color='rgba(60,60,60,0.3)
     )])
-
+    
     fig.update_layout(
         title_text="Voyage and Non-Voyage Paths",
         font_size=10,
         title_font_size=14,
         title_x=0.5,
-        paper_bgcolor=paper_bgcolor,
-        plot_bgcolor=plot_bgcolor
+        paper_bgcolor=paper_bgcolor,  #remove to set bg white 
+        plot_bgcolor=plot_bgcolor   #remove to set bg white 
     )
 
     fig.show()
+    
     return fig
-   #return plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
-
-def plot_cooccurrence_cat_matrix(df_categories, abbreviations=None):
-    """
-    Plots a co-occurrence matrix using abbreviations for category labels in the heatmap.
-    
-    Parameters:
-    - df_categories (DataFrame): The DataFrame with 'article' and 'level_1' columns.
-    - abbreviations (dict, optional): A dictionary mapping full category names to abbreviations.
-    """
-    # Get the unique categories from the DataFrame
-    categories_full = df_categories['level_1'].unique()
-    
-    # If abbreviations are provided, map the full category names to abbreviations
-    if abbreviations:
-        categories_abbr = [abbreviations.get(cat, cat) for cat in categories_full]
-    else:
-        categories_abbr = categories_full
-
-    # Group by article and collect unique level_1 categories for each article
-    article_combinations = (
-        df_categories.groupby("article")["level_1"]
-        .apply(lambda x: tuple(sorted(x.unique())))  # Sort and get unique level_1 values as a tuple
-    )
-    combination_counts = article_combinations.value_counts()
-
-    # Create a co-occurrence matrix using abbreviations for the plot
-    matrix = pd.DataFrame(0, index=categories_abbr, columns=categories_abbr)
-
-    # Fill the matrix with co-occurrence counts
-    for comb, count in zip(combination_counts.index, combination_counts):
-        for i in comb:
-            for j in comb:
-                matrix.loc[abbreviations.get(i, i), abbreviations.get(j, j)] += count
-
-    # Calculate the total articles for each category using the diagonal
-    total_articles = pd.Series(np.diag(matrix), index=categories_abbr)
-
-    # Mask for the upper triangle excluding the diagonal
-    mask = np.triu(np.ones_like(matrix, dtype=bool), k=1) | (matrix == 0)
-
-    # Plot the co-occurrence matrix
-
-    # Set up the color map for masked cells
-    cmap = sn.color_palette("YlGnBu", as_cmap=True)
-    cmap.set_bad(color='white')  # Set masked cells to appear white
-
-    plt.figure(figsize=(10, 8))
-    sn.heatmap(
-        matrix,
-        annot=True,
-        fmt="g",
-        cmap=cmap,
-        cbar_kws={'label': 'Number of Co-occurrences'},
-        mask=mask,
-        linewidths=0.5
-    )
-
-    # Annotate each off-diagonal cell in the upper triangle to suggest a main category
-    for i, cat1 in enumerate(categories_abbr):
-        for j, cat2 in enumerate(categories_abbr):
-            if i < j and matrix.loc[cat1, cat2] > 0:  # Only upper triangle and non-zero cells
-                # Determine which category has fewer total articles
-                if total_articles[cat1] < total_articles[cat2]:
-                    main_category = cat1
-                else:
-                    main_category = cat2
-                
-                # Annotate the cell with the suggested main category
-                plt.text(
-                    j + 0.5, i + 0.5,
-                    f"{main_category}",
-                    ha='center', va='center', color="red", fontsize=8, fontweight='bold'
-                )
-
-    # Customize labels and layout
-    plt.title("Co-occurrence of Level 1 Categories in Articles with Main Category Suggestion")
-    plt.xlabel("Level 1 Category")
-    plt.ylabel("Level 1 Category")
-    plt.xticks(rotation=0, fontsize=10)
-    plt.yticks(fontsize=10, rotation=0)
-
-    # Add an enhanced legend for abbreviations
-    if abbreviations:
-        legend_labels = [f"{abbr} = {name}" for name, abbr in abbreviations.items()]
-        plt.figtext(0.98, 0.5, "\n".join(legend_labels), ha="left", fontsize=10, bbox=dict(
-            facecolor="lightgrey", edgecolor="black", boxstyle="round,pad=0.5", linewidth=1))
-
-    plt.tight_layout()
-    plt.show()
-
-def matrix_common_paths(data):  
-    # Extract transitions and create transition counts
-    transitions = {}
-    for _, row in data.iterrows():
-        path = row['Category Path'].split(" -> ")
-        count = row['Count']
-        for i in range(len(path) - 1):
-            from_cat = path[i]
-            to_cat = path[i + 1]
-            if from_cat not in transitions:
-                transitions[from_cat] = {}
-            if to_cat not in transitions[from_cat]:
-                transitions[from_cat][to_cat] = 0
-            transitions[from_cat][to_cat] += count
-
-    # Create transition matrix DataFrame
-    categories = sorted(set([key for key in transitions] + [k for subdict in transitions.values() for k in subdict]))
-    transition_matrix = pd.DataFrame(0, index=categories, columns=categories)
-
-    # Populate the transition matrix with counts
-    for from_cat, to_cats in transitions.items():
-        for to_cat, count in to_cats.items():
-            transition_matrix.at[from_cat, to_cat] = count
-    
-    return transition_matrix
 
 def plot_articles_pie_chart(df, palette, abbreviations=None):
     """
@@ -944,8 +909,6 @@ def plot_articles_pie_chart(df, palette, abbreviations=None):
     """
     # Group by Level 1 category and count the number of articles
     category_counts = df['level_1'].value_counts()
-
-    # Sort the categories by the article count in ascending order
     category_counts = category_counts.sort_values(ascending=True)
 
     # Handle small categories (less than 3%) by grouping them as 'Others'
@@ -975,7 +938,7 @@ def plot_articles_pie_chart(df, palette, abbreviations=None):
         autopct='%1.1f%%', 
         startangle=90,
         pctdistance=0.8,
-        colors=[palette[label] for label in large_categories.index],
+        colors = [palette.get(label, '#cccccc') for label in large_categories.index]
     )
 
     # Customize the font and color of the numbers
