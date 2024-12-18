@@ -82,8 +82,6 @@ def read_all():
         df_shortest_path_length, 
         df_unfinished, 
         df_finished, 
-        df_sm, 
-        df_scat, 
         df_article
     )
 

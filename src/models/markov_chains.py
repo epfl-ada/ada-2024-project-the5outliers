@@ -259,7 +259,9 @@ def plot_article_step_divergence(step_divergence, color_dict):
         yaxis=dict(title='Divergence Value'),
         width=800,  # Set the width of the plot
         height=600, # Set the height of the plot
-        title=dict(text="Stepwise Divergence from Random Path")
+        title=dict(text="Stepwise Divergence from Random Path"),
+        legend_tracegroupgap=3
+
     )
 
     return fig

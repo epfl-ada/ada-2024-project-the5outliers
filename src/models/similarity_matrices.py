@@ -177,3 +177,116 @@ def category_jaccard_similarity(categories, level_weights):
     )
 
     return similarity_weighted_jaccard_df  
+
+
+def get_path_similarities(df_paths, df_sm):
+    """
+    Calculate the similarities between consecutive steps in paths.
+    This function processes a DataFrame containing paths, where each path is a sequence of steps separated by semicolons. 
+    It replaces back clicks in the paths, splits them into individual steps, and then calculates the similarity 
+    between each consecutive step using a similarity matrix provided in another 
+    DataFrame.
+
+    Parameters:
+    -----------
+        df_paths (pd.DataFrame): A DataFrame containing a column 'path' with semicolon-separated steps.
+        df_sm (pd.DataFrame): A DataFrame representing the similarity matrix where each entry [i][j] indicates the similarity between step i and step j.
+    
+    Returns:
+    --------
+        list: A list of lists, where each inner list contains the similarities between consecutive steps for each path.
+    """
+
+
+    from src.data.data_loader import replace_back_clicks
+
+    all_finished_paths = [replace_back_clicks(path).split(';') for path in df_paths['path'].tolist()]
+    path_similarities = []
+
+    for path in all_finished_paths:
+        path_similarity = []
+        for step in range(len(path)-1):
+            current, next = path[step], path[step+1]
+            path_similarity.append(df_sm[current][next])
+
+        path_similarities.append(path_similarity)
+
+    return path_similarities
+
+def agg_mean_similarity(path_similarities, max_length):
+    """
+    Calculate the mean and standard error of the mean (SEM) for each position in a list of similarity paths.
+    
+    Parameters:
+    -----------
+        path_similarities (list of lists): A list where each element is a list of similarity values.
+        max_length (int): The maximum length to consider for the similarity paths.
+    
+    Returns:
+    --------
+        tuple: Two lists, the first containing the mean values and the second containing the SEM values for each position.
+    """
+
+    
+    means = []
+    sems = []  
+    
+    # Step 2: Iterate through each position (from 0 to max_length - 1)
+    for i in range(max_length):
+        # Collect values at position i from all lists that have that index
+        values_at_position = [lst[i] for lst in path_similarities if len(lst) > i]
+        
+        # If there are values, calculate the mean and SEM
+        if values_at_position:
+            mean_value = np.mean(values_at_position)
+            sem_value = 1.96 * np.std(values_at_position) / np.sqrt(len(values_at_position))
+            means.append(mean_value)
+            sems.append(sem_value)
+    
+    return means, sems
+
+
+def get_normalised_mean_similarity(similarities, max_length):
+    """
+    Calculate the normalised (in range [0, 1]) mean similarity and standard error of the mean (SEM) for given similarity matrices.
+    This function takes a list of similarity matrices and computes the mean similarity and SEM for each matrix.
+    
+    Parameters:
+    -----------
+        similarities (list): A list containing two similarity matrices.
+        max_length (int): The maximum length to consider for the similarity calculation.
+    
+    Returns:
+    --------
+        tuple: A tuple containing two lists:
+            - normalised_means (list): The normalised mean similarities for each matrix.
+            - normalised_sems (list): The normalised SEMs for each matrix.
+    
+    Raises:
+    -------
+        AssertionError: If the length of the similarities list is not equal to 2.
+    """
+
+
+    # should always give Voyage/Non-Voyage pairs
+    assert len(similarities) == 2
+
+    mean_sim = []
+    sem_sim = []
+    for similarity in similarities:
+        mean, sem = agg_mean_similarity(similarity, max_length=max_length)
+        mean_sim.append(mean)
+        sem_sim.append(sem)
+
+    normalised_means = []
+    normalised_sems = []
+
+    combined_min = min(min(mean_sim[0]), min(mean_sim[1]))
+    combined_max = max(max(mean_sim[0]), max(mean_sim[1]))
+    
+    for i in range(2):
+
+        normalised_means.append((mean_sim[i] - combined_min) / (combined_max - combined_min)) 
+        normalised_sems.append((sem_sim[i]) / (combined_max - combined_min))
+    
+    return normalised_means, normalised_sems
