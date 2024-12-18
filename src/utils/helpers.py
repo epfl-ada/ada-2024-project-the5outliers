@@ -1,7 +1,5 @@
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
-import plotly.offline
 from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
 from collections import Counter
@@ -128,9 +126,7 @@ def create_treemap_data(df, show_articles=True):
 
     return labels, parents, values, ids
 
-import plotly.graph_objects as go
-
-def create_colored_treemap(labels, parents, values, ids, color_palette, title="Treemap"):
+def create_colored_treemap(labels, parents, values, ids, color_palette=None, title="Treemap"):
     """
     Creates a Plotly Treemap with colors propagated from level_1 to all children.
 
@@ -139,7 +135,7 @@ def create_colored_treemap(labels, parents, values, ids, color_palette, title="T
     - parents (list): List of parent nodes.
     - values (list): List of values (used for proportional sizing).
     - ids (list): List of unique node IDs.
-    - color_palette (dict): Dictionary mapping level_1 labels to colors.
+    - color_palette (dict): Dictionary mapping level_1 labels to colors. If None, a default palette is used.
     - title (str): Title of the treemap.
 
     Returns:
@@ -157,8 +153,10 @@ def create_colored_treemap(labels, parents, values, ids, color_palette, title="T
             colors.append(color)
         return colors
 
+    colors = None
     # Generate colors for the hierarchy
-    colors = get_colors_for_hierarchy(ids, color_palette)
+    if color_palette:
+        colors = get_colors_for_hierarchy(ids, color_palette)
 
     # Create the Treemap
     fig = go.Figure(go.Treemap(
@@ -166,7 +164,7 @@ def create_colored_treemap(labels, parents, values, ids, color_palette, title="T
         parents=parents,
         values=values,
         ids=ids,
-        marker=dict(colors=colors),  # Apply the propagated colors
+        marker=dict(colors=colors), # Apply colors if available
         textfont=dict(size=18),
         branchvalues='total'  # Ensures proportional sizing by summation of children
     ))
@@ -1594,7 +1592,7 @@ def plot_difficulties_voyage (df_finished, df_unfinished, palette_category_dict)
     fig.show()
 
 def location_click_on_page(df, parser):
-    df['position'] = np.NaN
+    df['position'] = np.nan
 
     for i in range(len(df)):
         articles = df['path'][i].split(';')
@@ -1605,8 +1603,8 @@ def location_click_on_page(df, parser):
                 continue
             else:
                 info = parser.find_link_positions(articles[a], articles[a+1])
-                position.append(info['article_link_position'][0]/info['total_links'] if len(info['article_link_position']) != 0 else np.NaN)
-        df.loc[i, 'position'] = np.mean(position)
+                position.append(info['article_link_position'][0]/info['total_links'] if len(info['article_link_position']) != 0 else np.nan)
+        df.loc[i, 'position'] = np.mean(position) if len(position) != 0 else np.nan
     return df
 
 def find_category_position_articles(parser, df_categories, categories_others) :
@@ -1623,10 +1621,10 @@ def find_category_position_articles(parser, df_categories, categories_others) :
             # if category not in list(df_categories[df_categories['article'] == article]["level_1"]) :
             for a in voyage_list:
                 info = parser.find_link_positions(article, a)
-                position.append(info['article_link_position'][0]/info['total_links'] if len(info['article_link_position']) != 0 else np.NaN)
+                position.append(info['article_link_position'][0]/info['total_links'] if len(info['article_link_position']) != 0 else np.nan)
             position_voyage.append(np.mean(position))
             # else :
-            #     position_voyage.append(np.NaN)
+            #     position_voyage.append(np.nan)
         return position_voyage
     link_per_cat = {}
 

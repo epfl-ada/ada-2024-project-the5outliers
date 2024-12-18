@@ -1,3 +1,20 @@
+conda create -n ada_p  python=3.10.15 --yes
+conda activate ada_p
+conda install seaborn -y
+conda install plotly -y  
+conda install tqdm -y
+conda install bs4 -y  
+conda install networkx -y  
+conda install ipywidgets -y
+conda install nbformat -y
+pip install FlagEmbedding
+
+conda env export --name my_env > requirements.yml
+
+
+
+
+
 # The5Outliers - *Wikispeedia Voyages*: why so many players pass through Geography or Countries to reach their target
 
 

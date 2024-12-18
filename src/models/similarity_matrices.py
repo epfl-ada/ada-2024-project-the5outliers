@@ -1,11 +1,10 @@
-from FlagEmbedding import BGEM3FlagModel
 import numpy as np
-import networkx as nx
-import os
 import pandas as pd
 from tqdm import tqdm
-from transformers import BertTokenizer, BertModel
+import networkx as nx
 import torch
+from FlagEmbedding import BGEM3FlagModel
+from transformers import BertTokenizer, BertModel
 
 def compute_save_all():
     '''Call this function from the base of the repo. Computes article embeddings, the two similarity matrices and the articles parsed and saves them to data.'''
