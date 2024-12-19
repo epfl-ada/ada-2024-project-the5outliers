@@ -37,6 +37,11 @@ PALETTE_CATEGORY_DICT_COLORS = {
 'Others': '#d2dae3',
  }
 
+PALETTE_POSITION_LINKS = {'Clicked Link Position in Paths': '#AFD2E9', 
+                          'Article Link Position in Articles': '#9A7197'}
+
+PALETTE_SECTIONS = ['#AFD2E9','#9d96b8','#9A7197']
+
 CATEGORIES_OTHERS = [
     'Art',
     'Business Studies',
