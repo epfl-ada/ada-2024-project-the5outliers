@@ -185,6 +185,8 @@ def create_colored_treemap(labels, parents, values, ids, color_palette=None, tit
         plot_bgcolor=plot_bgcolor
     )
 
+    fig.show()
+
     return fig
 
 def assign_world_region_categories(df_categories, world_region_categories):
@@ -838,8 +840,6 @@ def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_n
         xaxis3_title="Percentage difference",
         legend_title_text="Path Type",
         template="plotly_white",
-        width=1300,
-        height=550,
         paper_bgcolor=paper_bgcolor,
         plot_bgcolor=plot_bgcolor
     )
