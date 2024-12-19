@@ -1731,7 +1731,7 @@ def plot_donut_link_position(df_merged, colors):
     data = [
 
         go.Pie(values=[df_ratio_path["total_link_core"], df_ratio_path["total_link_in_abstract"], df_ratio_path["total_link_in_infobox"]],
-        labels=['Core','Abstract', "Info-box"],
+        labels=['Body','Abstract', "Info-box"],
         domain={'x':[0.3,0.7], 'y':[0.16,0.8]}, 
         hole=0.5,
         direction='clockwise',
@@ -1744,7 +1744,7 @@ def plot_donut_link_position(df_merged, colors):
         marker={'colors':colors},), 
 
         go.Pie(values=[df_ratio_click["link_in_core"] ,df_ratio_click["link_in_abstract"] ,df_ratio_click["link_in_infobox"]],
-            labels=['Core','Abstract', "Info-box"],
+            labels=['Body','Abstract', "Info-box"],
             domain={'x':[0.1,0.9], 'y':[0,1]},
             hole=0.75,
             direction='clockwise',
