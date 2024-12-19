@@ -18,24 +18,29 @@ CATEGORY_ABBREVIATIONS = {
 }
 
 # Category-Color Mapping
-PALETTE_CATEGORY_DICT_COLORS = { 
-    'Art': '#46039f',
-    'Business Studies': '#FF6692',
-    'Citizenship': '#ab63fa',
-    'World Regions': '#00cc96',
-    'Design and Technology': '#7fbc41',
-    'Everyday life': '#FECB52',
-    'Geography': '#b8e186',
-    'History': '#FFA15A',
-    'IT': '#bd3786',
-    'Language and literature':  '#ff4c4c',
-    'Mathematics': '#ccdbb6',
-    'Music': '#FF97FF',
-    'People': '#19d3f3',
-    'Religion': '#2a3f5f',
-    'Science': '#636efa',
-    'Others': '#C8D4E3',
-}
+PALETTE_CATEGORY_DICT_COLORS = {
+'Art': '#69419f',
+'Business Studies': '#ffa3bd',
+'Citizenship': '#ca9ffa',
+'World Regions': '#00ba82',#'#03fcba',
+'Design and Technology': '#97bc72',
+'Everyday life': '#fedf96',
+'Geography': '#c8e1aa',
+'History': '#ffc69c',
+'IT': '#bd6c9c',
+'Language and literature': '#ff9393',
+'Mathematics': '#d2dbc4',
+'Music': '#ffc0ff',
+'People': '#70dff3',
+'Religion': '#3f4b5f',
+'Science': '#9fa5fa',
+'Others': '#d2dae3',
+ }
+
+PALETTE_POSITION_LINKS = {'Clicked Link Position in Paths': '#AFD2E9', 
+                          'Article Link Position in Articles': '#9A7197'}
+
+PALETTE_SECTIONS = ['#AFD2E9','#9d96b8','#9A7197']
 
 CATEGORIES_OTHERS = [
     'Art',

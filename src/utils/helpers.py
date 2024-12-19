@@ -1,6 +1,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import plotly.express as px
 import matplotlib.pyplot as plt
 from collections import Counter
 import numpy as np
@@ -126,7 +127,7 @@ def create_treemap_data(df, show_articles=True):
 
     return labels, parents, values, ids
 
-def create_colored_treemap(labels, parents, values, ids, color_palette=None, title="Treemap"):
+def create_colored_treemap(labels, parents, values, ids, color_palette=None, title="Treemap", background_color='transparent'):
     """
     Creates a Plotly Treemap with colors propagated from level_1 to all children.
 
@@ -137,6 +138,7 @@ def create_colored_treemap(labels, parents, values, ids, color_palette=None, tit
     - ids (list): List of unique node IDs.
     - color_palette (dict): Dictionary mapping level_1 labels to colors. If None, a default palette is used.
     - title (str): Title of the treemap.
+    - background_color (str): Background color of the plot ('white' or 'transparent').
 
     Returns:
     - fig (plotly.graph_objects.Figure): A Plotly Treemap figure.
@@ -153,10 +155,16 @@ def create_colored_treemap(labels, parents, values, ids, color_palette=None, tit
             colors.append(color)
         return colors
 
-    colors = None
-    # Generate colors for the hierarchy
-    if color_palette:
-        colors = get_colors_for_hierarchy(ids, color_palette)
+    # Generate colors for the hierarchy if palette is given
+    colors = get_colors_for_hierarchy(ids, color_palette) if color_palette else None
+
+    # Determine the background color settings
+    if background_color == 'transparent':
+        paper_bgcolor = 'rgba(0,0,0,0)'  # Transparent
+        plot_bgcolor = 'rgba(0,0,0,0)'   # Transparent
+    else:
+        paper_bgcolor = background_color  # Solid color
+        plot_bgcolor = background_color   # Solid color
 
     # Create the Treemap
     fig = go.Figure(go.Treemap(
@@ -169,15 +177,17 @@ def create_colored_treemap(labels, parents, values, ids, color_palette=None, tit
         branchvalues='total'  # Ensures proportional sizing by summation of children
     ))
 
-    # Update the layout
+    # Update the layout with background color and title
     fig.update_layout(
         margin=dict(t=50, l=10, r=10, b=5),
-        title=title
+        title=title,
+        paper_bgcolor=paper_bgcolor,
+        plot_bgcolor=plot_bgcolor
     )
+
     fig.show()
 
     return fig
-
 
 def assign_world_region_categories(df_categories, world_region_categories):
     """
@@ -716,7 +726,8 @@ def process_and_calculate_differences(dataframes, article_to_category, column_na
 
     return category_fin_means, category_unf_means
 
-def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_norm_steps, category_fin_means_norm, category_unf_means_norm, palette, title="Category Percentage Used at Each Step of Finished Paths"):
+def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_norm_steps, category_fin_means_norm, 
+                       category_unf_means_norm, palette, title="Category Percentage Used at Each Step",background_color='white'):
     """
     Plot an interactive line plot of category frequencies across positions with both normalized and non-normalized views.
     Add bar plot as a subplot with inverted axes and hashed bars for 'unfinished'.
@@ -728,6 +739,7 @@ def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_n
         category_unf_means_norm (DataFrame): Unfinished category percentages.
         palette (dict): Color palette for categories.
         title (str): Title of the plot.
+        background_color (str): Background color of the plot ('white' or 'transparent').
     """
     # Extract and sort categories
     categories = S_T_fin_percentages_norm_steps["categories"].unique()
@@ -736,7 +748,7 @@ def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_n
     fig = make_subplots(
         rows=1, cols=3, 
         subplot_titles=("Users' paths", "Optimal paths", "Percentage difference across all steps"),
-        horizontal_spacing=0.1
+        horizontal_spacing=0.05
     )
     
     # Add non-normalized line plot traces (Users)
@@ -809,6 +821,14 @@ def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_n
             ), row=1, col=3
         )
 
+    # Determine the background color
+    if background_color == 'transparent':
+        paper_bgcolor = 'rgba(0,0,0,0)'  # Transparent
+        plot_bgcolor = 'rgba(0,0,0,0)'   # Transparent
+    else:
+        paper_bgcolor = background_color  # Solid color
+        plot_bgcolor = background_color   # Solid color
+
     # Update layout
     fig.update_layout(
         title=title,
@@ -820,12 +840,17 @@ def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_n
         xaxis3_title="Percentage difference",
         legend_title_text="Path Type",
         template="plotly_white",
-        width=1300,
-        height=550
+        paper_bgcolor=paper_bgcolor,
+        plot_bgcolor=plot_bgcolor
     )
+
+    # Remove y-axis for the third subplot
+    fig.update_yaxes(showticklabels=False, title=None, row=1, col=3)
 
     # Show the plot
     fig.show()
+
+    return fig
 
 
 def filter_most_specific_category(df_categories):
@@ -1081,8 +1106,6 @@ def plot_sankey_voyage(df, background_color='transparent'):
         paper_bgcolor=paper_bgcolor,  #remove to set bg white 
         plot_bgcolor=plot_bgcolor   #remove to set bg white 
     )
-
-    fig.show()
     
     return fig
 
@@ -1388,6 +1411,7 @@ def plot_proportion_category_start_stop_pies(df_article, palette, abbreviations=
 
     plt.show()
 
+
 def plot_metrics_by_category(df_article, metrics, palette_category_dict, category_abbreviations):
     """
     Plots bar charts for multiple metrics by category using Plotly.
@@ -1455,6 +1479,7 @@ def remove_outliers(df, col):
     IQR = Q3 - Q1
     filtered_df = df[(df[col] >= (Q1 - 1.5 * IQR)) & (df[col] <= (Q3 + 1.5 * IQR))]
     return filtered_df
+
 
 def plot_difficulties_voyage (df_finished, df_unfinished, palette_category_dict):
     color_voyage = palette_category_dict['World Regions']
@@ -1532,56 +1557,84 @@ def plot_difficulties_voyage (df_finished, df_unfinished, palette_category_dict)
         fig.add_trace(
             go.Bar(
                 x=filtered_data["finished_label"],
-                y=filtered_data["count"],
-                text=filtered_data["percentage"],
+                y=filtered_data["percentage"],
+                text=filtered_data["count"],
                 name=voyage_label,
                 marker_color=color,
-                texttemplate="%{text}%",
+                texttemplate="Count: %{text}",
             ),
             row=1, col=2
         )
         
     # Axis labels
-    fig.update_yaxes(title_text="Count", row=1, col=2)
+    fig.update_yaxes(title_text="Pourcentage (%)", row=1, col=2)
     fig.update_xaxes(title_text="Path Type", row=1, col=2)    
         
     # ==== PLOT 3 (Bar Plot: Rating Distribution for Voyage Games) ====
     df_voyage_rating = df_finished_voyage[df_finished_voyage["Wikispeedia_Voyage"] == True].copy()
     df_voyage_rating["rating"] = df_voyage_rating["rating"].fillna('NaN').astype(str)
+    df_voyage_rating["have_back_click"] = df_voyage_rating["back_clicks"] > 0
+    back_click_per_rating = pd.DataFrame(df_voyage_rating.groupby("rating")["have_back_click"].mean()).reset_index() # count the number of path with a rating for each rating
     df_voyage_rating = df_voyage_rating.groupby("rating")["rating"].count().reset_index(name="count")
-    df_voyage_rating["count"] = df_voyage_rating["count"] / df_voyage_rating["count"].sum() * 100
-    
-    fig.add_trace(
-        go.Bar(
-            x=df_voyage_rating["rating"], 
-            y=df_voyage_rating["count"], 
-            marker_color=color_voyage, 
-            name="Voyage",
-            showlegend=False
-        ),
-        row=2, col=1
-    )
+    df_voyage_rating["pourcent"] = df_voyage_rating["count"] / df_voyage_rating["count"].sum() * 100
+    df_voyage_rating["back_clicks"] = back_click_per_rating["have_back_click"].values
+    df_voyage_rating["Back-Click"] = df_voyage_rating["back_clicks"]*df_voyage_rating["pourcent"]
+    df_voyage_rating["Without Back-Click"] = (1 - df_voyage_rating["back_clicks"])*df_voyage_rating["pourcent"]
+    df_voyage_rating = pd.melt(df_voyage_rating, id_vars=['rating', 'count', 'pourcent'], value_vars=['Back-Click', 'Without Back-Click'], var_name='back_click')
+
+    df = df_voyage_rating[df_voyage_rating["back_click"]== 'Back-Click']
+    fig.add_trace(go.Bar(x=df["rating"],
+                            y=df["value"],
+                            marker_color=color_voyage,
+                            marker_pattern_shape="/",
+                            offsetgroup=0,
+                            legendgroup='Back-Click',
+                            name = 'Back-Click'),
+                    row=2, col=1)
+    df = df_voyage_rating[df_voyage_rating["back_click"]== 'Without Back-Click']
+    fig.add_trace(go.Bar(x=df["rating"],
+                            y=df["value"],
+                            marker_color=color_voyage,
+                            offsetgroup=0,
+                            base = df_voyage_rating[df_voyage_rating["back_click"]== 'Back-Click']["value"],
+                            legendgroup='Without Back-Click',
+                            name = 'Without Back-Click'),
+                    row=2, col=1)
 
     # axis labels
     fig.update_yaxes(title_text="Pourcentage", row=2, col=1)
     fig.update_xaxes(title_text="Rating", row=2, col=1)
 
-    # ==== PLOT 4 (Bar Plot: Rating Distribution for Non-Voyage Games) ====
+    # # ==== PLOT 4 (Bar Plot: Rating Distribution for Non-Voyage Games) ====
     df_non_voyage_rating = df_finished_voyage[df_finished_voyage["Wikispeedia_Voyage"] == False].copy()
     df_non_voyage_rating["rating"] = df_non_voyage_rating["rating"].fillna('NaN').astype(str)
+    df_non_voyage_rating["have_back_click"] = df_non_voyage_rating["back_clicks"] > 0
+    back_click_per_rating = pd.DataFrame(df_non_voyage_rating.groupby("rating")["have_back_click"].mean()).reset_index() # count the number of path with a rating for each rating
     df_non_voyage_rating = df_non_voyage_rating.groupby("rating")["rating"].count().reset_index(name="count")
-    df_non_voyage_rating["count"] = df_non_voyage_rating["count"] / df_non_voyage_rating["count"].sum() * 100
+    df_non_voyage_rating["pourcent"] = df_non_voyage_rating["count"] / df_non_voyage_rating["count"].sum() * 100
+    df_non_voyage_rating["back_clicks"] = back_click_per_rating["have_back_click"].values
+    df_non_voyage_rating["Back-Click"] = df_non_voyage_rating["back_clicks"]*df_non_voyage_rating["pourcent"]
+    df_non_voyage_rating["Without Back-Click"] = (1 - df_non_voyage_rating["back_clicks"])*df_non_voyage_rating["pourcent"]
+    df_non_voyage_rating = pd.melt(df_non_voyage_rating, id_vars=['rating', 'count', 'pourcent'], value_vars=['Back-Click', 'Without Back-Click'], var_name='back_click')
 
-    fig.add_trace(
-        go.Bar(
-            x=df_non_voyage_rating["rating"], 
-            y=df_non_voyage_rating["count"], 
-            marker_color="gray", 
-            name="Non-Voyage",
-            showlegend=False
-        ),
-        row=2, col=2
-    )
+    df = df_non_voyage_rating[df_non_voyage_rating["back_click"]== 'Back-Click']
+    fig.add_trace(go.Bar(x=df["rating"],
+                            y=df["value"],
+                            marker_color="gray",
+                            marker_pattern_shape="/",
+                            offsetgroup=0,
+                            showlegend=False,
+                            name = 'Back-Click'),
+                    row=2, col=2)
+    df = df_non_voyage_rating[df_non_voyage_rating["back_click"]== 'Without Back-Click']
+    fig.add_trace(go.Bar(x=df["rating"],
+                            y=df["value"],
+                            marker_color="gray",
+                            offsetgroup=0,
+                            base = df_non_voyage_rating[df_non_voyage_rating["back_click"]== 'Back-Click']["value"],
+                            showlegend=False,
+                            name = 'Without Back-Click'),
+                    row=2, col=2)
 
     # axis labels
     fig.update_yaxes(title_text="Pourcentage", row=2, col=2)
@@ -1602,19 +1655,43 @@ def plot_difficulties_voyage (df_finished, df_unfinished, palette_category_dict)
     fig.show()
 
 def location_click_on_page(df, parser):
-    df['position'] = np.nan
 
     for i in range(len(df)):
         articles = df['path'][i].split(';')
         
         position = []
-        for a in range(len(articles)-1):
+        core = np.zeros(len(articles)-1)
+        total = 0
+        abstract = np.zeros(len(articles)-1)
+        total_abstract = 0
+        infobox = np.zeros(len(articles)-1)
+        total_infobox = 0
+        for j, a in enumerate(range(len(articles)-1)):
             if articles[a+1] == '<' or articles[a] == '<':
                 continue
             else:
                 info = parser.find_link_positions(articles[a], articles[a+1])
-                position.append(info['article_link_position'][0]/info['total_links'] if len(info['article_link_position']) != 0 else np.nan)
+                position.append(np.mean(info['article_link_position'])/info['total_links'] if len(info['article_link_position']) != 0 else np.nan)
+                
+                # case no table in abstract :
+                table_link = info.get("table_link_position", [])
+                table_not_in_abstract = [table for table in table_link if table not in info.get("article_link_position", [])]
+                core[j] = 1 if len(info["article_link_position"]) > (len(info.get("abstract_link_position", [])) + len(table_not_in_abstract)) else 0
+                
+                total += info['total_links']
+                abstract[j] = 1 if 'abstract_link_position' in info.keys() else 0
+                total_abstract += info["abstract_links"] if 'abstract_links' in info.keys() else 0
+                infobox[j]= 1 if 'table_link_position' in info.keys() else 0
+                total_infobox += info["tables"] if 'tables' in info.keys() else 0
+                
         df.loc[i, 'position'] = np.mean(position) if len(position) != 0 else np.nan
+        df.loc[i, 'link_in_core'] = np.sum(core)
+        df.loc[i, 'total_links'] = total
+        df.loc[i, 'link_in_abstract'] = np.sum(abstract)
+        
+        df.loc[i, 'total_link_in_abstract'] = total_abstract
+        df.loc[i, 'link_in_infobox'] = np.sum(infobox)
+        df.loc[i, 'total_link_in_infobox'] = total_infobox
     return df
 
 def find_category_position_articles(parser, df_categories, categories_others) :
@@ -1626,13 +1703,13 @@ def find_category_position_articles(parser, df_categories, categories_others) :
         article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
         articles_links_voyage = {k: [v_select for v_select in v if v_select in article_to_category.keys() and article_to_category[v_select] == category] for k, v in articles_links.items()}
         position_voyage = []
-        for article, voyage_list in tqdm(articles_links_voyage.items()):
+        for article, voyage_list in articles_links_voyage.items():
             position = []
             # if category not in list(df_categories[df_categories['article'] == article]["level_1"]) :
             for a in voyage_list:
                 info = parser.find_link_positions(article, a)
-                position.append(info['article_link_position'][0]/info['total_links'] if len(info['article_link_position']) != 0 else np.nan)
-            position_voyage.append(np.mean(position))
+                position.append(np.mean(info['article_link_position'])/info['total_links'] if len(info['article_link_position']) != 0 else np.nan)
+            position_voyage.append(np.mean(position) if len(position) != 0 else np.nan)
             # else :
             #     position_voyage.append(np.nan)
         return position_voyage
@@ -1641,3 +1718,68 @@ def find_category_position_articles(parser, df_categories, categories_others) :
     for category in categories_others:
         link_per_cat[category] = mean_link_position_per_category(parser, df_categories, category=category)
     return link_per_cat
+
+def plot_comparison_category_click_position(df_merged, df_category_position, colors = {'Clicked Link Position in Paths': '#AFD2E9', 'Article Link Position in Articles': '#9A7197'}):
+    df_merged["category"] = "All"
+    df_merged["Legend :"] = "Clicked Link Position in Paths"
+    df_melted = pd.melt(df_category_position, var_name='category', value_name='position').dropna()
+    df_melted["Legend :"] = "Article Link Position in Articles"
+    df_comparison_path_category = pd.concat([df_merged[["category", "position", "Legend :"]], df_melted])
+
+    fig = px.box(df_comparison_path_category, x="category", y="position", color="Legend :", title="Position of the clicked link in articles compared to position of each category in articles", color_discrete_map=colors)
+    fig.update_xaxes(tickangle=45)
+
+    fig.update_layout(
+        autosize=False,
+        width=1500,
+        height=500,
+        boxgroupgap=0.2, # update
+        boxgap=0)
+    fig.show()
+
+def plot_donut_link_position(df_merged, colors):
+
+    df_info = df_merged[["total_links", "total_link_in_abstract", "total_link_in_infobox", "link_in_core", "link_in_abstract", "link_in_infobox"]]
+    df_info["total_link_core"] = df_info["total_links"] - df_info["total_link_in_abstract"] - df_info["total_link_in_infobox"]
+    df_info["link_all"] = df_info["link_in_core"] + df_info["link_in_abstract"] + df_info["link_in_infobox"]
+    df_info
+
+    df_ratio_path = df_info[["total_link_in_abstract", "total_link_in_infobox", "total_link_core"]].div(df_info["total_links"], axis=0)
+    df_ratio_path = df_ratio_path.mean()
+    df_ratio_click = df_info[["link_in_abstract", "link_in_infobox", "link_in_core"]].div(df_info["link_all"], axis=0)
+    df_ratio_click = df_ratio_click.mean()
+
+    data = [
+
+        go.Pie(values=[df_ratio_path["total_link_core"], df_ratio_path["total_link_in_abstract"], df_ratio_path["total_link_in_infobox"]],
+        labels=['Body','Abstract', "Info-box"],
+        domain={'x':[0.3,0.7], 'y':[0.16,0.8]}, 
+        hole=0.5,
+        direction='clockwise',
+        sort=False,
+        title=dict(
+                text="Link position<br>in articles",
+                font=dict(size=16)
+            ),
+        texttemplate="%{percent:.0%}",
+        marker={'colors':colors},), 
+
+        go.Pie(values=[df_ratio_click["link_in_core"] ,df_ratio_click["link_in_abstract"] ,df_ratio_click["link_in_infobox"]],
+            labels=['Body','Abstract', "Info-box"],
+            domain={'x':[0.1,0.9], 'y':[0,1]},
+            hole=0.75,
+            direction='clockwise',
+            sort=False,
+            marker={'colors':colors},
+            title=dict(
+                text="Link position in clicks",
+                font=dict(size=16)
+            ),
+            titleposition='top center',
+            texttemplate="%{percent:.0%}",
+            showlegend=True)
+    ]
+        
+    figure=go.Figure(data=data, layout={'title':'Mean distribution of link positions across all articles in all paths <br>compared to the mean distribution of clicked link positions in all paths.', 'width': 800, 'height': 600})
+
+    figure.show()
