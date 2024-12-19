@@ -5,6 +5,7 @@ import seaborn as sn
 import plotly.express as px
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
+from collections import Counter
 
 def hex_to_rgba(hex_color):
     # Remove the hash symbol if present
@@ -391,4 +392,50 @@ def markov_example(parser, user_transitions):
     plt.title('Difference')
 
     plt.tight_layout()
+    plt.show()
+
+def plot_transitions_normalized(df_article_names, parser, df_categories, palette):
+    """
+    Visualizes the normalized ratio of transitions to article counts for each category.
+
+    This function computes the Markov transition probabilities for a set of articles, 
+    maps them to their respective categories, and calculates the ratio of total transitions 
+    to the number of articles in each category. The results are plotted as a bar chart.
+
+    Parameters:
+    -----------
+    df_article_names : list or pd.Series
+        A list or Series of article names for which transitions are computed.
+
+    parser : object
+        A parser object used to compute Markov transition probabilities. It is assumed 
+        to have the necessary methods or configurations required by `get_transition_probabilities`.
+
+    df_categories : pd.DataFrame
+        A DataFrame mapping articles to their categories. It should contain:
+        - 'article': Column with article names.
+        - 'level_1': Column with corresponding category labels.
+
+    palette : dict
+        A dictionary mapping category names to specific colors for the plot.
+    """
+    markov_transitions = get_transition_probabilities(df_article_names, parser, backclicks=False, normalise=False)
+    article_to_category = dict(zip(df_categories['article'], df_categories['level_1']))
+    mapped_categories = [article_to_category.get(article, 'Unknown') for article in df_article_names]
+    transitions_per_category = pd.DataFrame({'category': mapped_categories, 'transition': markov_transitions.sum(axis=1)})
+    transitions_per_category=transitions_per_category.groupby('category', as_index=False).sum()
+    category_counts = Counter(mapped_categories)
+    category_counts = pd.DataFrame(category_counts.items(), columns=['category', 'count'])
+
+    transitions_per_category = pd.merge(category_counts , transitions_per_category, on='category')
+    transitions_per_category['ratio'] =  transitions_per_category['transition'] / transitions_per_category['count']
+    transitions_per_category = transitions_per_category.sort_values(by='ratio')
+
+    sn.barplot(data=transitions_per_category, x='category', y='ratio', hue='category', legend=None, palette=palette)
+
+    # Customize the plot
+    plt.xlabel('Category')
+    plt.ylabel('Transitions / # Articles in Category')
+    plt.title('Ratio of Count to Transitions by Category')
+    plt.xticks(rotation=90) 
     plt.show()

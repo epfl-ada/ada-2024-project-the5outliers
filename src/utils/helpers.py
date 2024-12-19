@@ -727,7 +727,7 @@ def process_and_calculate_differences(dataframes, article_to_category, column_na
     return category_fin_means, category_unf_means
 
 def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_norm_steps, category_fin_means_norm, 
-                       category_unf_means_norm, palette, title="Category Percentage Used at Each Step of Finished Paths",background_color='white'):
+                       category_unf_means_norm, palette, title="Category Percentage Used at Each Step",background_color='white'):
     """
     Plot an interactive line plot of category frequencies across positions with both normalized and non-normalized views.
     Add bar plot as a subplot with inverted axes and hashed bars for 'unfinished'.
@@ -1410,6 +1410,7 @@ def plot_proportion_category_start_stop_pies(df_article, palette, abbreviations=
     plt.tight_layout()
 
     plt.show()
+
 
 def plot_metrics_by_category(df_article, metrics, palette_category_dict, category_abbreviations):
     """
