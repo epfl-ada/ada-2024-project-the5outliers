@@ -232,14 +232,13 @@ def plot_network(H, df_categories, palette, title="Network Graph", node_size=700
     plt.legend(
         handles,
         labels,
-        bbox_to_anchor=(0.8, 0.4),  # Position the legend (x,y)
+        #bbox_to_anchor=(0.8, 0.4),  # Position the legend (x,y)
+        loc = 'best',
         title="Categories",
         fontsize=10,        
         title_fontsize=12  
     )
-    
-    #add_legend_category(fig, palette_category_dict.pop('Others',palette_category_dict), None, bbox_to_anchor=(1, 0.4))
-    
+
     # PLOT figure----------------------------------------------------------------------------
     plt.title(title, fontsize=23, color='#3b3b3b')
     plt.axis("off")
@@ -247,15 +246,7 @@ def plot_network(H, df_categories, palette, title="Network Graph", node_size=700
     plt.show()
 
 
-
-
-
-
-
-
-##### article network 1 click -----------------------------------------------------------------
-
-
+##### Article network 1 click -----------------------------------------------------------------
 def build_article_network(paths_click, article_to_category, palette, include_self_loops=False):
     '''
     builds network of article

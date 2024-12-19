@@ -96,7 +96,7 @@ Our team of five works collaboratively, contributing equally to the project by p
 # clone project
 git clone https://github.com/epfl-ada/ada-2024-project-the5outliers.git
 
-# create conda called 'ada_project' with all required packages
+# create conda called 'ada_p' with all required packages
 conda env create -f requirements.yml
 ```
 

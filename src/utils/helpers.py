@@ -224,6 +224,16 @@ def assign_world_region_categories(df_categories, world_region_categories):
 
     return df_categories_filtered
 
+def compute_optimal_paths(df_links, df_shortest_path, df_finished, df_unfinished):
+    optimal_paths = find_all_source_target_pairs(df_finished, df_unfinished, df_links)
+    optimal_paths = calculate_optimal_path(df_links, optimal_paths, df_shortest_path)
+    optimal_paths = optimal_paths.drop(columns=['matrix_length','matches_matrix'])
+
+    # Save the optimal paths to a pickle file
+    optimal_paths.to_pickle('data/paths-and-graph/optimal_paths.pkl')
+
+    return optimal_paths
+
 def get_main_categories_paths(df_paths, df_categories, omit_loops=False, one_level=True, finished=True):
     """
     Give category paths from article paths and start-end categories.

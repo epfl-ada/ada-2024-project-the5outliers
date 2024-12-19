@@ -29,10 +29,29 @@ PALETTE_CATEGORY_DICT_COLORS = {
     'History': '#FFA15A',
     'IT': '#bd3786',
     'Language and literature':  '#ff4c4c',
-    'Mathematics': '#e6f5d0',
+    'Mathematics': '#ccdbb6',
     'Music': '#FF97FF',
     'People': '#19d3f3',
     'Religion': '#2a3f5f',
     'Science': '#636efa',
     'Others': '#C8D4E3',
 }
+
+CATEGORIES_OTHERS = [
+    'Art',
+    'Business Studies',
+    'Citizenship',
+    'World Regions',
+    'Design and Technology',
+    'Everyday life',
+    'Geography',
+    'History',
+    'IT',
+    'Language and literature',
+    'Mathematics',
+    'Music',
+    'People',
+    'Religion',
+    'Science',
+    'Others'
+]
