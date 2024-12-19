@@ -18,22 +18,24 @@ CATEGORY_ABBREVIATIONS = {
 }
 
 # Category-Color Mapping
-PALETTE_CATEGORY_DICT_COLORS = {'Art': '#1c013f',
- 'Business Studies': '#66283a',
- 'Citizenship': '#442764',
- 'World Regions': '#00cc96',
- 'Design and Technology': '#324b1a',
- 'Everyday life': '#655120',
- 'Geography': '#495a35',
- 'History': '#664024',
- 'IT': '#4b1635',
- 'Language and literature': '#661e1e',
- 'Mathematics': '#515748',
- 'Music': '#663c66',
- 'People': '#095461',
- 'Religion': '#101926',
- 'Science': '#272b64',
- 'Others': '#50545a'}
+PALETTE_CATEGORY_DICT_COLORS = {
+'Art': '#69419f',
+'Business Studies': '#ffa3bd',
+'Citizenship': '#ca9ffa',
+'World Regions': '#00ba82',#'#03fcba',
+'Design and Technology': '#97bc72',
+'Everyday life': '#fedf96',
+'Geography': '#c8e1aa',
+'History': '#ffc69c',
+'IT': '#bd6c9c',
+'Language and literature': '#ff9393',
+'Mathematics': '#d2dbc4',
+'Music': '#ffc0ff',
+'People': '#70dff3',
+'Religion': '#3f4b5f',
+'Science': '#9fa5fa',
+'Others': '#d2dae3',
+ }
 
 CATEGORIES_OTHERS = [
     'Art',

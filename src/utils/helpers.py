@@ -126,7 +126,7 @@ def create_treemap_data(df, show_articles=True):
 
     return labels, parents, values, ids
 
-def create_colored_treemap(labels, parents, values, ids, color_palette=None, title="Treemap"):
+def create_colored_treemap(labels, parents, values, ids, color_palette=None, title="Treemap", background_color='transparent'):
     """
     Creates a Plotly Treemap with colors propagated from level_1 to all children.
 
@@ -137,6 +137,7 @@ def create_colored_treemap(labels, parents, values, ids, color_palette=None, tit
     - ids (list): List of unique node IDs.
     - color_palette (dict): Dictionary mapping level_1 labels to colors. If None, a default palette is used.
     - title (str): Title of the treemap.
+    - background_color (str): Background color of the plot ('white' or 'transparent').
 
     Returns:
     - fig (plotly.graph_objects.Figure): A Plotly Treemap figure.
@@ -153,10 +154,16 @@ def create_colored_treemap(labels, parents, values, ids, color_palette=None, tit
             colors.append(color)
         return colors
 
-    colors = None
-    # Generate colors for the hierarchy
-    if color_palette:
-        colors = get_colors_for_hierarchy(ids, color_palette)
+    # Generate colors for the hierarchy if palette is given
+    colors = get_colors_for_hierarchy(ids, color_palette) if color_palette else None
+
+    # Determine the background color settings
+    if background_color == 'transparent':
+        paper_bgcolor = 'rgba(0,0,0,0)'  # Transparent
+        plot_bgcolor = 'rgba(0,0,0,0)'   # Transparent
+    else:
+        paper_bgcolor = background_color  # Solid color
+        plot_bgcolor = background_color   # Solid color
 
     # Create the Treemap
     fig = go.Figure(go.Treemap(
@@ -169,15 +176,15 @@ def create_colored_treemap(labels, parents, values, ids, color_palette=None, tit
         branchvalues='total'  # Ensures proportional sizing by summation of children
     ))
 
-    # Update the layout
+    # Update the layout with background color and title
     fig.update_layout(
         margin=dict(t=50, l=10, r=10, b=5),
-        title=title
+        title=title,
+        paper_bgcolor=paper_bgcolor,
+        plot_bgcolor=plot_bgcolor
     )
-    fig.show()
 
     return fig
-
 
 def assign_world_region_categories(df_categories, world_region_categories):
     """
@@ -716,7 +723,8 @@ def process_and_calculate_differences(dataframes, article_to_category, column_na
 
     return category_fin_means, category_unf_means
 
-def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_norm_steps, category_fin_means_norm, category_unf_means_norm, palette, title="Category Percentage Used at Each Step of Finished Paths"):
+def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_norm_steps, category_fin_means_norm, 
+                       category_unf_means_norm, palette, title="Category Percentage Used at Each Step of Finished Paths",background_color='white'):
     """
     Plot an interactive line plot of category frequencies across positions with both normalized and non-normalized views.
     Add bar plot as a subplot with inverted axes and hashed bars for 'unfinished'.
@@ -728,6 +736,7 @@ def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_n
         category_unf_means_norm (DataFrame): Unfinished category percentages.
         palette (dict): Color palette for categories.
         title (str): Title of the plot.
+        background_color (str): Background color of the plot ('white' or 'transparent').
     """
     # Extract and sort categories
     categories = S_T_fin_percentages_norm_steps["categories"].unique()
@@ -736,7 +745,7 @@ def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_n
     fig = make_subplots(
         rows=1, cols=3, 
         subplot_titles=("Users' paths", "Optimal paths", "Percentage difference across all steps"),
-        horizontal_spacing=0.1
+        horizontal_spacing=0.05
     )
     
     # Add non-normalized line plot traces (Users)
@@ -809,6 +818,14 @@ def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_n
             ), row=1, col=3
         )
 
+    # Determine the background color
+    if background_color == 'transparent':
+        paper_bgcolor = 'rgba(0,0,0,0)'  # Transparent
+        plot_bgcolor = 'rgba(0,0,0,0)'   # Transparent
+    else:
+        paper_bgcolor = background_color  # Solid color
+        plot_bgcolor = background_color   # Solid color
+
     # Update layout
     fig.update_layout(
         title=title,
@@ -821,8 +838,13 @@ def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_n
         legend_title_text="Path Type",
         template="plotly_white",
         width=1300,
-        height=550
+        height=550,
+        paper_bgcolor=paper_bgcolor,
+        plot_bgcolor=plot_bgcolor
     )
+
+    # Remove y-axis for the third subplot
+    fig.update_yaxes(showticklabels=False, title=None, row=1, col=3)
 
     # Show the plot
     fig.show()
@@ -1083,8 +1105,6 @@ def plot_sankey_voyage(df, background_color='transparent'):
         paper_bgcolor=paper_bgcolor,  #remove to set bg white 
         plot_bgcolor=plot_bgcolor   #remove to set bg white 
     )
-
-    fig.show()
     
     return fig
 
