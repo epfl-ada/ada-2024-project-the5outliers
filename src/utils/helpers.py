@@ -827,6 +827,8 @@ def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_n
     # Show the plot
     fig.show()
 
+    return fig
+
 
 def filter_most_specific_category(df_categories):
     """
