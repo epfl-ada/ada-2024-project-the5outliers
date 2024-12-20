@@ -1841,7 +1841,7 @@ def plot_comparison_category_click_position(df_merged, df_category_position, col
 
 def plot_donut_link_position(df_merged, colors):
 
-    df_info = df_merged[["total_links", "total_link_in_abstract", "total_link_in_infobox", "link_in_core", "link_in_abstract", "link_in_infobox"]]
+    df_info = df_merged[["total_links", "total_link_in_abstract", "total_link_in_infobox", "link_in_core", "link_in_abstract", "link_in_infobox"]].copy()
     df_info["total_link_core"] = df_info["total_links"] - df_info["total_link_in_abstract"] - df_info["total_link_in_infobox"]
     df_info["link_all"] = df_info["link_in_core"] + df_info["link_in_abstract"] + df_info["link_in_infobox"]
     df_info
