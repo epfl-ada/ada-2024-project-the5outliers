@@ -272,7 +272,7 @@ def plot_article_step_divergence(step_divergence, df_categories, N_articles):
         title=dict(text=f"Mean Stepwise Divergence from Random Path for {N_articles} Articles with Highest Divergence"),
         legend_tracegroupgap=3,
         paper_bgcolor="#fafaf9", 
-        plot_bgcolor="#dbdbdb",  
+        plot_bgcolor="#fff",  
 
     )
 
@@ -341,7 +341,7 @@ def plot_category_step_divergence(step_divergence, color_dict):
         title=dict(text="Mean Stepwise Divergence from Random Path per Category"),
         legend_tracegroupgap=3,
         paper_bgcolor="#fafaf9", 
-        plot_bgcolor="#dbdbdb",  
+        plot_bgcolor="#fff",  
     )
 
     return fig
