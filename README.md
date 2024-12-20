@@ -51,8 +51,8 @@ $$S_C(a_1, a_2)=\frac{a_1 \cdot a_2}{||a_1|| \cdot ||a_2||}$$
 <h3 style= "color: #c7c9cf"> Assignment of methods to research questions </h3>
 
 1. Leverage features from HTML parsing and Markov Chains to evaluate article connectivity, transition probabilities, and the influence of link positions on user choices.
-2. Compare difficulty metrics and success rates between *Voyages* and other strategies. Use semantic similarity analysis to assess whether *Voyages* exhibit lower cosine similarity between steps compared to other paths taken by users.
-3. Construct a directed graph to compute optimal paths, and calculate the normalized percentage of times each category is visited.
+2. Compare difficulty metrics and success rates between *Voyages* and other strategies. Use semantic similarity analysis to assess whether *Voyages* exhibit lower cosine similarity between steps compared to other paths taken by users. This allows to find out if users may take more difficult detours with Voyages.
+3. Construct a directed graph to compute optimal paths, and calculate the normalized percentage of times each category is visited. Compare with how often users visit categories along the paths and compare with the optimal paths.
 
 <h2 style= "color: #c7c9cf"> Additional Datasets </h2> 
 
