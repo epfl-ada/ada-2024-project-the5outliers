@@ -832,13 +832,12 @@ def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_n
     # Update layout
     fig.update_layout(
         title=title,
-        xaxis_title="Step",
-        xaxis2_title="Step",
+        xaxis=dict(title="Step",dtick=1),
+        xaxis2=dict(title="Step",dtick=1),
         yaxis=dict(title="Percentage", automargin=True, range=[0, 50]),
         yaxis2=dict(automargin=True, range=[0, 50]),
         yaxis3=dict(autorange="reversed"),  # Reverse the y-axis order
         xaxis3_title="Percentage difference",
-        legend_title_text="Path Type",
         template="plotly_white",
         paper_bgcolor=paper_bgcolor,
         plot_bgcolor=plot_bgcolor
