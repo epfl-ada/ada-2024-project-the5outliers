@@ -10,6 +10,9 @@ data/paths-and-graph/*
 !data/paths-and-graph/parsed_html.pkl
 !data/paths-and-graph/optimal_paths.pkl
 
+# Files
+*.csv
+
 # Cache
 *.bin
 .vscode/settings.json

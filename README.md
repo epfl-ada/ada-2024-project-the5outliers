@@ -16,7 +16,7 @@ Our results show that World Regions articles are highly connected, with a dense 
 <h2 style= "color: #c7c9cf"> Methods </h2> 
 
 <h3 style= "color: #c7c9cf"> HTML parsing </h3>
-Parsing allows to find interesting features of the wikipedia articles: the number of words and links, and hence the link density. It also gives structural information about the pages: categories, subcategories, the presence and nature of tables. For each of these structures, the number of words and the list of present links is reported. 
+Parsing allows to find interesting features of the wikipedia articles: the number of words and the total number of links,taking in acount duplicates inside the same page. It also gives structural information about the pages: categories, subcategories, the presence and nature of tables. For each of these structures, the number of words and the list of present links is reported. 
 
 <h3 style= "color: #c7c9cf"> Networks and Graphs </h3>
 
@@ -33,7 +33,7 @@ $$S_C(a_1, a_2)=\frac{a_1 \cdot a_2}{||a_1|| \cdot ||a_2||}$$
 <h3 style= "color: #c7c9cf"> Assignment of methods to research questions </h3>
 
 1. Leverage features from HTML parsing and Markov Chains to evaluate article connectivity, transition probabilities, and the influence of link positions on user choices.
-2. Compare difficulty metrics (such as path length, duration, rating, and back-clicks) and success rates between Voyages and other strategies. Use semantic similarity analysis to assess whether steps towards World Regions exhibit lower cosine similarity compared to other steps taken by users.
+2. Compare difficulty metrics (such as path length, duration, rating, and back-clicks) and success rates between *Voyages* and other strategies. Use semantic similarity analysis to assess whether steps towards *World Regions* exhibit lower cosine similarity compared to other steps taken by users.
 3. Construct a directed graph to compute optimal paths, and calculate the normalized percentage of times each category is visited.
 
 <h2 style= "color: #c7c9cf"> Additional Datasets </h2> 
@@ -48,7 +48,7 @@ Camille Challier:
 
 Yannick Detrois: 
 
-David Friou: 
+David Friou: Data preprocessing, handling category articles, working on networks, and proper connection and functionality of the entire code.
 
 Marine Ract: 
 
@@ -75,7 +75,7 @@ All the results are in the ```results.ipynb```. Running the notebook will showca
 
 <h3 style= "color: #c7c9cf"> Project Structure </h3> 
 
-The directory structure of new project looks like this:
+The directory structure of our project looks like this:
 
 ```
 ├── data                        <- Project data files
@@ -85,9 +85,9 @@ The directory structure of new project looks like this:
 │   ├── models                          <- Model directory
 │   ├── utils                           <- Utility directory
 │
-├── results.ipynb               <- a well-structured notebook showing the results
+├── results.ipynb               <- Our Notebook showing our main results 
 │
 ├── .gitignore                  <- List of files ignored by git
-├── requirements.txt            <- File for installing python dependencies
+├── requirements.yml            <- File for installing python dependencies
 └── README.md
 ```
