@@ -1482,7 +1482,7 @@ def remove_outliers(df, col):
 
 
 def plot_difficulties_voyage (df_finished, df_unfinished, palette_category_dict):
-    color_voyage = palette_category_dict['World Regions']
+    color_voyage = palette_category_dict['Voyages']
     
     df_finished_voyage = df_finished.copy()
     df_unfinished_voyage = df_unfinished.copy()

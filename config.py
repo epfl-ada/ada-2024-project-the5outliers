@@ -22,7 +22,7 @@ PALETTE_CATEGORY_DICT_COLORS = {
 'Art': '#69419f',
 'Business Studies': '#ffa3bd',
 'Citizenship': '#ca9ffa',
-'World Regions': '#00ba82',#'#03fcba',
+'World Regions': '#00ba82',
 'Design and Technology': '#97bc72',
 'Everyday life': '#fedf96',
 'Geography': '#c8e1aa',
@@ -34,6 +34,7 @@ PALETTE_CATEGORY_DICT_COLORS = {
 'People': '#70dff3',
 'Religion': '#3f4b5f',
 'Science': '#9fa5fa',
+'Voyages': '#00cbe6',
 'Others': '#d2dae3',
  }
 
