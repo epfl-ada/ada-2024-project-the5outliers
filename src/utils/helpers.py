@@ -1762,7 +1762,7 @@ def annotate_pvalues_combinaison(fig, p_values, x_labels, bar_positions, bar_hei
             fig.add_shape(type='line', x0=x1, y0=y + h, x1=x2, y1=y + h, line=dict(color='black'), xref='x', yref='y')
             fig.add_shape(type='line', x0=x2, y0=y + h, x1=x2, y1=y, line=dict(color='black'), xref='x', yref='y')
             
-            fig.add_annotation(x=(x1 + x2) * .5, y= y + h+ 0.02, text=convert_pvalue_to_asterisks(p_value), showarrow=False, font=dict(color='black'))
+            fig.add_annotation(x=(x1 + x2) * .5, y= y + h+ 0.03, text=convert_pvalue_to_asterisks(p_value), showarrow=False, font=dict(color='black'))
         elif annotation == "top" :
             fig.add_annotation(x=x2+0.1, y= max_height + 0.07, text=convert_pvalue_to_asterisks(p_value), showarrow=False, font=dict(color='black'))
 
@@ -1823,7 +1823,7 @@ def plot_comparison_category_click_position(df_merged, df_category_position, col
     bar_pos[0] -= 0.34
     bar_h= np.ones(len(categories_name))
     annotate_pvalues_combinaison(fig, p_values, categories_name,  bar_positions = bar_pos, bar_heights = bar_h, combinaison_nb = len(p_values.keys()), annotation = "top")
-    fig = custom_legend_pval(fig)
+    fig = custom_legend_pval(fig, title = False, y_pos = 0.65, x_pos=1.03)
 
     fig.update_layout(
         autosize=False,
