@@ -1307,9 +1307,11 @@ def plot_proportions_of_in_and_out_degree_in_categories(df, palette, abbreviatio
     ax[1].set_title("Proportion of Links Leaving Each Category", fontsize=14)
 
     # Add a single legend
+    used_categories = df["category"].unique()
+    used_palette = {key: palette[key] for key in used_categories}
     add_legend_category(
         fig=fig,
-        palette_category=palette,
+        palette_category=used_palette,
         categories=palette.keys(),
         bbox_to_anchor=(1, 0.75)
     )
@@ -1399,9 +1401,11 @@ def plot_proportion_category_start_stop_pies(df_article, palette, abbreviations=
     )
     ax[1].set_title("Proportion of categories in target articles", fontsize=14)
 
+    used_categories = df_article["category"].unique()
+    used_palette = {key: palette[key] for key in used_categories}
     add_legend_category(
         fig=fig,
-        palette_category=palette,
+        palette_category=used_palette,
         categories=palette.keys(),
         bbox_to_anchor=(1.15, 0.7)
     )
@@ -1441,7 +1445,9 @@ def plot_metrics_by_category(df_article, metrics, palette_category_dict, categor
         if row == 0 :
             ax[row, col].set_xlabel('')
 
-    add_legend_category(fig,palette_category_dict, category_abbreviations)
+    used_categories = df_article["category"].unique()
+    used_palette = {key: palette_category_dict[key] for key in used_categories}
+    add_legend_category(fig, used_palette, category_abbreviations)
 
     plt.suptitle("Articles Complexity by Categories", y=1, fontsize=16)
     plt.tight_layout()
@@ -1467,7 +1473,9 @@ def plot_article_popularity_link_density(df_article, df_finished_voyage, palette
         ax[i+1].legend_.remove()
         ax[i+1].set_ylabel('')
 
-    add_legend_category(fig,palette_category_dict, category_abbreviations)
+    used_categories = df_article["category"].unique()
+    used_palette = {key: palette_category_dict[key] for key in used_categories}
+    add_legend_category(fig, used_palette, category_abbreviations)
     plt.suptitle("Correlation between article popularity and link density", y=1, fontsize=16)
     plt.tight_layout()
     plt.show()
@@ -1841,7 +1849,7 @@ def plot_comparison_category_click_position(df_merged, df_category_position, col
 
 def plot_donut_link_position(df_merged, colors):
 
-    df_info = df_merged[["total_links", "total_link_in_abstract", "total_link_in_infobox", "link_in_core", "link_in_abstract", "link_in_infobox"]]
+    df_info = df_merged[["total_links", "total_link_in_abstract", "total_link_in_infobox", "link_in_core", "link_in_abstract", "link_in_infobox"]].copy()
     df_info["total_link_core"] = df_info["total_links"] - df_info["total_link_in_abstract"] - df_info["total_link_in_infobox"]
     df_info["link_all"] = df_info["link_in_core"] + df_info["link_in_abstract"] + df_info["link_in_infobox"]
     df_info
