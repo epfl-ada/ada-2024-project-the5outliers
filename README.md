@@ -45,6 +45,8 @@ The semantic similarity matrices are computed in a few different ways. One way i
 
 $$S_C(a_1, a_2)=\frac{a_1 \cdot a_2}{||a_1|| \cdot ||a_2||}$$
 
+$$D_{KL}(P || Q)_{ij} = P_{ij}  \log \frac{P_{ij}}{Q_{ij}}$$
+
 <h3 style= "color: #c7c9cf"> Assignment of methods to research questions </h3>
 
 1. Leverage features from HTML parsing and Markov Chains to evaluate article connectivity, transition probabilities, and the influence of link positions on user choices.
