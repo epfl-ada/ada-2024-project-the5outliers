@@ -267,12 +267,12 @@ def plot_article_step_divergence(step_divergence, df_categories, N_articles):
             tickmode='linear'  # Ensures all integer ticks are shown
         ),
         yaxis=dict(title='Divergence Value'),
-        width=900,  # Set the width of the plot
-        height=600, # Set the height of the plot
+        #width=900,  # Set the width of the plot
+        #height=600, # Set the height of the plot
         title=dict(text=f"Mean Stepwise Divergence from Random Path for {N_articles} Articles with Highest Divergence"),
         legend_tracegroupgap=3,
         paper_bgcolor="#fafaf9", 
-        plot_bgcolor="#fff",  
+        plot_bgcolor="#fafaf9",  
 
     )
 
@@ -336,12 +336,12 @@ def plot_category_step_divergence(step_divergence, color_dict):
             tickmode='linear'  # Ensures all integer ticks are shown
         ),
         yaxis=dict(title='Divergence Value'),
-        width=800,  # Set the width of the plot
-        height=600, # Set the height of the plot
+        #width=800,  # Set the width of the plot
+        #height=600, # Set the height of the plot
         title=dict(text="Mean Stepwise Divergence from Random Path per Category"),
         legend_tracegroupgap=3,
         paper_bgcolor="#fafaf9", 
-        plot_bgcolor="#fff",  
+        plot_bgcolor="#fafaf9",  
     )
 
     return fig

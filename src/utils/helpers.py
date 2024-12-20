@@ -1388,7 +1388,7 @@ def plot_proportion_category_start_stop_pies(df_article, palette, abbreviations=
         startangle=90,
         pctdistance=0.8
     )
-    ax[0].set_title("Proportion of categories in start articles", fontsize=14)
+    ax[0].set_title("Proportion of categories in source articles", fontsize=14)
 
     # Plot target articles pie in 1 slot
     ax[1].pie(
@@ -1409,7 +1409,7 @@ def plot_proportion_category_start_stop_pies(df_article, palette, abbreviations=
         categories=palette.keys(),
         bbox_to_anchor=(1.15, 0.7)
     )
-    plt.suptitle("Proportions of Categories in Start and Target Articles", fontsize=16, y=1.05)
+    plt.suptitle("Proportions of Categories in Source and Target Articles", fontsize=16, y=1.05)
     plt.tight_layout()
 
     plt.show()
@@ -1476,7 +1476,7 @@ def plot_article_popularity_link_density(df_article, df_finished_voyage, palette
     used_categories = df_article["category"].unique()
     used_palette = {key: palette_category_dict[key] for key in used_categories}
     add_legend_category(fig, used_palette, category_abbreviations)
-    plt.suptitle("Correlation between article popularity and link density", y=1, fontsize=16)
+    plt.suptitle("Relationship between article popularity and link density", y=1, fontsize=16)
     plt.tight_layout()
     plt.show()
 
