@@ -25,7 +25,7 @@ Optimal (shortest) paths are determined by modeling the Wikispeedia article netw
 <h3 style= "color: #c7c9cf"> Markov Chains </h3>
 
 
-Modelling the influence of the network structure that could inherently bias user paths. Every article is assigned transition probabilities to all other articles based on the number of links present in this article. The transition matrix's $Q$ normalised left eigenvector with eigenvalue $1$ (i.e. $x$ such that $xQ=x$) gives the steady-state of the system (useful to find central articles of the network). 
+Markov Chains are used to model the influence of the network structure that could inherently bias user paths. Every article is assigned transition probabilities to all other articles based on the number of links present in this article. The transition matrix's $Q$ normalised left eigenvector with eigenvalue $1$ (i.e. $x$ such that $xQ=x$) gives the steady-state of the system (useful to find central articles of the network). 
 
 To compare with the user paths, we can count the number of transitions at every step and regroup them in a matrix P. To see the deviation with the random path we use the Kullback–Leibler ($KL$) divergence, defined element-wise as 
 
@@ -44,7 +44,7 @@ The distributions of game duration, path length, back-clicks and ratings for bot
 
 <h3 style= "color: #c7c9cf"> Semantic similarity </h3>
 
-The semantic similarity matrices are computed in a few different ways. One way is to compute them directly through the article names using BGEM3<sup>1</sup> and BERT as embedding model. The similarity between two articles with embedded name vectors a<sub>1</sub> and a<sub>2</sub> is defined as the cosine similarity 
+The semantic similarity matrices are computed in a few different ways. One way is to compute them directly through the article names using BGEM3<sup>1</sup> and BERT as embedding model. The similarity between two articles with embedded name vectors a<sub>1</sub> and a<sub>2</sub> is defined as the cosine similarity. 
 
 $$S_C(a_1, a_2)=\frac{a_1 \cdot a_2}{||a_1|| \cdot ||a_2||}$$
 
@@ -68,7 +68,7 @@ Yannick Detrois: HTMLParser, Website Design and Redaction, Markov Chains, Simila
 
 David Friou: Data preprocessing, handling category articles, working on networks, and proper connection and functionality of the entire code.
 
-Marine Ract: Plots, Website Design
+Marine Ract: User Networks, Markov chains, Sankey plots, Website Design.
 
 Marianne Scoglio: Extraction of Voyages, comparaison between user and optimal paths. 
 
