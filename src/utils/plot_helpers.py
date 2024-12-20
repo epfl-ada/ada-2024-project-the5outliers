@@ -7,6 +7,68 @@ import seaborn as sn
 import scipy.stats as stats
 import numpy as np
 
+def create_colored_treemap(labels, parents, values, ids, color_palette=None, title="Treemap", background_color='transparent'):
+    """
+    Creates a Plotly Treemap with colors propagated from level_1 to all children.
+
+    Parameters:
+    - labels (list): List of node labels.
+    - parents (list): List of parent nodes.
+    - values (list): List of values (used for proportional sizing).
+    - ids (list): List of unique node IDs.
+    - color_palette (dict): Dictionary mapping level_1 labels to colors. If None, a default palette is used.
+    - title (str): Title of the treemap.
+    - background_color (str): Background color of the plot ('white' or 'transparent').
+
+    Returns:
+    - fig (plotly.graph_objects.Figure): A Plotly Treemap figure.
+    """
+
+    # Function to propagate level_1 color to all children
+    def get_colors_for_hierarchy(ids, color_palette):
+        colors = []
+        for tag in ids:
+            # Extract the level_1 part of the label (before any slash '/')
+            level_1 = tag.split('/')[0]
+            # Get the color for level_1; default to light gray if not found
+            color = color_palette.get(level_1, '#d3d3d3')
+            colors.append(color)
+        return colors
+
+    # Generate colors for the hierarchy if palette is given
+    colors = get_colors_for_hierarchy(ids, color_palette) if color_palette else None
+
+    # Determine the background color settings
+    if background_color == 'transparent':
+        paper_bgcolor = 'rgba(0,0,0,0)'  # Transparent
+        plot_bgcolor = 'rgba(0,0,0,0)'   # Transparent
+    else:
+        paper_bgcolor = background_color  # Solid color
+        plot_bgcolor = background_color   # Solid color
+
+    # Create the Treemap
+    fig = go.Figure(go.Treemap(
+        labels=labels,
+        parents=parents,
+        values=values,
+        ids=ids,
+        marker=dict(colors=colors), # Apply colors if available
+        textfont=dict(size=18),
+        branchvalues='total'  # Ensures proportional sizing by summation of children
+    ))
+
+    # Update the layout with background color and title
+    fig.update_layout(
+        margin=dict(t=50, l=10, r=10, b=5),
+        title=title,
+        paper_bgcolor=paper_bgcolor,
+        plot_bgcolor=plot_bgcolor
+    )
+
+    fig.show()
+
+    return fig
+
 def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_norm_steps, category_fin_means_norm, 
                        category_unf_means_norm, palette, title="Category Percentage Used at Each Step",background_color='white'):
     """
@@ -131,7 +193,6 @@ def plot_position_line(S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_n
     fig.show()
 
     return fig
-
 
 def plot_sankey_voyage(df, background_color='transparent'):
     """
@@ -545,7 +606,6 @@ def plot_proportion_category_start_stop_pies(df_article, palette, abbreviations=
 
     plt.show()
 
-
 def plot_metrics_by_category(df_article, metrics, palette_category_dict, category_abbreviations):
     """
     Plots bar charts for multiple metrics by category using Plotly.
@@ -630,7 +690,6 @@ def remove_outliers(df, col):
     IQR = Q3 - Q1
     filtered_df = df[(df[col] >= (Q1 - 1.5 * IQR)) & (df[col] <= (Q3 + 1.5 * IQR))]
     return filtered_df
-
 
 def plot_difficulties_voyage (df_finished, df_unfinished, palette_category_dict):
     """

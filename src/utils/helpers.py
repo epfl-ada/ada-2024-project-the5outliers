@@ -122,68 +122,6 @@ def create_treemap_data(df, show_articles=True):
 
     return labels, parents, values, ids
 
-def create_colored_treemap(labels, parents, values, ids, color_palette=None, title="Treemap", background_color='transparent'):
-    """
-    Creates a Plotly Treemap with colors propagated from level_1 to all children.
-
-    Parameters:
-    - labels (list): List of node labels.
-    - parents (list): List of parent nodes.
-    - values (list): List of values (used for proportional sizing).
-    - ids (list): List of unique node IDs.
-    - color_palette (dict): Dictionary mapping level_1 labels to colors. If None, a default palette is used.
-    - title (str): Title of the treemap.
-    - background_color (str): Background color of the plot ('white' or 'transparent').
-
-    Returns:
-    - fig (plotly.graph_objects.Figure): A Plotly Treemap figure.
-    """
-
-    # Function to propagate level_1 color to all children
-    def get_colors_for_hierarchy(ids, color_palette):
-        colors = []
-        for tag in ids:
-            # Extract the level_1 part of the label (before any slash '/')
-            level_1 = tag.split('/')[0]
-            # Get the color for level_1; default to light gray if not found
-            color = color_palette.get(level_1, '#d3d3d3')
-            colors.append(color)
-        return colors
-
-    # Generate colors for the hierarchy if palette is given
-    colors = get_colors_for_hierarchy(ids, color_palette) if color_palette else None
-
-    # Determine the background color settings
-    if background_color == 'transparent':
-        paper_bgcolor = 'rgba(0,0,0,0)'  # Transparent
-        plot_bgcolor = 'rgba(0,0,0,0)'   # Transparent
-    else:
-        paper_bgcolor = background_color  # Solid color
-        plot_bgcolor = background_color   # Solid color
-
-    # Create the Treemap
-    fig = go.Figure(go.Treemap(
-        labels=labels,
-        parents=parents,
-        values=values,
-        ids=ids,
-        marker=dict(colors=colors), # Apply colors if available
-        textfont=dict(size=18),
-        branchvalues='total'  # Ensures proportional sizing by summation of children
-    ))
-
-    # Update the layout with background color and title
-    fig.update_layout(
-        margin=dict(t=50, l=10, r=10, b=5),
-        title=title,
-        paper_bgcolor=paper_bgcolor,
-        plot_bgcolor=plot_bgcolor
-    )
-
-    fig.show()
-
-    return fig
-
 def assign_world_region_categories(df_categories, world_region_categories):
     """
     Processes a DataFrame to standardize and categorize subject categories, 
@@ -520,7 +458,6 @@ def clean_path_list(path):
         del path[idx - 1:idx + 1]  # Remove the element before '<' and '<' itself
     return path
 
-
 def users_paths(df_finished, df_unfinished, article_to_category):
     """
     Processes paths for finished and unfinished users by extracting sources, targets, and path categories.
@@ -815,7 +752,6 @@ def process_percentages(S_T_opt_fin_percentages, S_T_fin_percentages, category_m
     
     return S_T_fin_percentages_norm_steps, S_T_opt_fin_percentages_norm_steps
 
-
 def get_position_frequencies(df, max_position=5):
     """
     Calculate frequencies for each category at each position in the path up to `max_position`.
@@ -928,7 +864,6 @@ def find_category_position_articles(parser, df_categories, categories_others) :
     for category in categories_others:
         link_per_cat[category] = mean_link_position_per_category(parser, df_categories, category=category)
     return link_per_cat
-
 
 def location_click_on_page(df, parser):
     """
