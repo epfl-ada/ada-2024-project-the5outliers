@@ -6,7 +6,6 @@ from tqdm import tqdm
 from bs4 import BeautifulSoup
 from src.data.data_loader import replace_back_clicks
 
-
 class HTMLParser:
     def __init__(self, filepath='./data/articles_html/wp'):
         self.article_URLs = [] # full article paths
@@ -325,6 +324,11 @@ class HTMLParser:
         occurences_tables = article_start['abstract_links'][article_start['abstract_links'] == article_next].index'''
 
         # occurences in tables
+        link_tables = [ link for table in article_start['tables'] for link in table['table_links']]
+        occurences_tables = [i for i, x in enumerate(link_tables) if x == article_next]
+        if occurences_tables:
+            link_position['tables'] = len(link_tables)
+            link_position['table_link_position'] = [x+1 for x in occurences_tables]
 
         return link_position
     
