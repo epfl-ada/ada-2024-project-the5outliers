@@ -6,6 +6,7 @@ import plotly.express as px
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 from collections import Counter
+import config
 
 def hex_to_rgba(hex_color):
     # Remove the hash symbol if present
@@ -194,7 +195,7 @@ def get_step_divergences(df_article_names, parser, df_paths, num_steps=10, df_ca
 
     return KL_stats_step
 
-def plot_article_step_divergence(step_divergence, color_dict):
+def plot_article_step_divergence(step_divergence, df_categories, N_articles):
     """
     Plots the stepwise divergence (mean and std) from a random path for different articles.
     Parameters:
@@ -204,6 +205,13 @@ def plot_article_step_divergence(step_divergence, color_dict):
     Returns:
     None: This function displays a plot using Plotly Express.
     """
+
+    PALETTE_ARTICLE_DICT_COLORS = {}
+    for article in step_divergence.index:
+        art_row = df_categories[df_categories['article']==article]
+        PALETTE_ARTICLE_DICT_COLORS[art_row['article'].item()] = config.PALETTE_CATEGORY_DICT_COLORS.get(art_row['level_1'].item())
+
+    PALETTE_ARTICLE_DICT_COLORS['<'] = '#000000'
 
     # Flatten multi-index
     df_mean = step_divergence.xs('mean', level=1, axis=1)
@@ -229,13 +237,14 @@ def plot_article_step_divergence(step_divergence, color_dict):
         y = article_data['Divergence']
         upper_bound = y + article_data['Error']
         lower_bound = y - article_data['Error']
+        legend = f"{article} ({df_categories[df_categories['article'] == article]['level_1'].item()})"
 
         # Line trace
         fig.add_trace(go.Scatter(
             x=x, y=y, 
-            name=article,
-            line_color=color_dict[article],
-            legendgroup=article,  # Group traces by article name
+            name=legend,
+            line_color=PALETTE_ARTICLE_DICT_COLORS[article],
+            legendgroup=legend,  # Group traces by article name
             showlegend=True
         ))
 
@@ -244,11 +253,11 @@ def plot_article_step_divergence(step_divergence, color_dict):
             x=x + x[::-1],  # x, then reversed x
             y=upper_bound.to_list() + lower_bound.to_list()[::-1],  # upper, then lower reversed
             fill='toself',
-            fillcolor=hex_to_rgba(color_dict[article]),  # Convert color for transparency
+            fillcolor=hex_to_rgba(PALETTE_ARTICLE_DICT_COLORS[article]),  # Convert color for transparency
             line=dict(color='rgba(255,255,255,0)'),  # Invisible border line
             hoverinfo="skip",  # Skip hover info for the region
             showlegend=False,  # Do not show a separate legend entry
-            legendgroup=article  # Group with the corresponding line trace
+            legendgroup=legend  # Group with the corresponding line trace
         ))
 
     fig.update_layout(
@@ -258,10 +267,12 @@ def plot_article_step_divergence(step_divergence, color_dict):
             tickmode='linear'  # Ensures all integer ticks are shown
         ),
         yaxis=dict(title='Divergence Value'),
-        width=800,  # Set the width of the plot
+        width=900,  # Set the width of the plot
         height=600, # Set the height of the plot
-        title=dict(text="Stepwise Divergence from Random Path"),
-        legend_tracegroupgap=3
+        title=dict(text=f"Mean Stepwise Divergence from Random Path for {N_articles} Articles with Highest Divergence"),
+        legend_tracegroupgap=3,
+        paper_bgcolor="#fafaf9", 
+        plot_bgcolor="#dbdbdb",  
 
     )
 
@@ -327,8 +338,10 @@ def plot_category_step_divergence(step_divergence, color_dict):
         yaxis=dict(title='Divergence Value'),
         width=800,  # Set the width of the plot
         height=600, # Set the height of the plot
-        title=dict(text="Stepwise Divergence from Random Path"),
-        legend_tracegroupgap=3
+        title=dict(text="Mean Stepwise Divergence from Random Path per Category"),
+        legend_tracegroupgap=3,
+        paper_bgcolor="#fafaf9", 
+        plot_bgcolor="#dbdbdb",  
     )
 
     return fig
