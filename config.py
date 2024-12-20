@@ -36,6 +36,7 @@ PALETTE_CATEGORY_DICT_COLORS = {
 'Science': '#9fa5fa',
 'Voyages': '#00cbe6',
 'Others': '#d2dae3',
+'Countries': '#3b83f7'
  }
 
 PALETTE_POSITION_LINKS = {'Clicked Link Position in Paths': '#AFD2E9', 
