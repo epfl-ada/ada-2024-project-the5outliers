@@ -64,7 +64,6 @@ def create_colored_treemap(labels, parents, values, ids, color_palette=None, tit
         paper_bgcolor=paper_bgcolor,
         plot_bgcolor=plot_bgcolor
     )
-
     fig.show()
 
     return fig
@@ -875,7 +874,6 @@ def plot_difficulties_voyage (df_finished, df_unfinished, palette_category_dict)
         violingap=0.4, 
         violinmode="overlay",
     )
-
     fig.show()
 
 def convert_pvalue_to_asterisks(pvalue):
@@ -1036,6 +1034,7 @@ def plot_comparison_category_click_position(df_merged, df_category_position, col
         yaxis=dict(
         title="Position",
         ),)
+    
     fig.show()
 
 def plot_donut_link_position(df_merged, colors):
@@ -1214,7 +1213,7 @@ def plot_back_clicks(df_finished,rating_order_plot2, rating_colors, rating_order
     plt.tight_layout()
     plt.show()
 
-def plot_similarity(axs, fig, means, sems, colours):
+def plot_similarity(axs, fig, means, sems, colours, labels):
     """
     Plots the mean name similarity between previous and next articles in user paths.
     
@@ -1224,6 +1223,7 @@ def plot_similarity(axs, fig, means, sems, colours):
     - means (list): List of mean similarity values.
     - sems (list): List of standard error of the mean values.
     - colours (list): List of colors for the plot.
+    - labels (list): List of labels for the plot.
     """
     for i in range(4):
         sn.lineplot(x=np.arange(1, len(means[i])+1), y=means[i], lw=3, color=colours[i], label=labels[i], ax=axs[i//2])
