@@ -790,7 +790,7 @@ def plot_difficulties_voyage (df_finished, df_unfinished, palette_category_dict)
         )
         
     # Axis labels
-    fig.update_yaxes(title_text="Pourcentage (%)", row=1, col=2)
+    fig.update_yaxes(title_text="Percentage", row=1, col=2)
     fig.update_xaxes(title_text="Path Type", row=1, col=2)    
         
     # ==== PLOT 3 (Bar Plot: Rating Distribution for Voyage Games) ====
@@ -860,7 +860,7 @@ def plot_difficulties_voyage (df_finished, df_unfinished, palette_category_dict)
                     row=2, col=2)
 
     # axis labels
-    fig.update_yaxes(title_text="Pourcentage", row=2, col=2)
+    fig.update_yaxes(title_text="Percentage", row=2, col=2)
     fig.update_xaxes(title_text="Rating", row=2, col=2)
 
     # ==== Final Layout Update ====
@@ -870,7 +870,7 @@ def plot_difficulties_voyage (df_finished, df_unfinished, palette_category_dict)
         showlegend=True,
         legend_title="",
         xaxis_title="Game Type",
-        yaxis_title="Count/Percentage",
+        yaxis_title= "Time (seconds)",
         violingap=0.4, 
         violinmode="overlay",
     )
