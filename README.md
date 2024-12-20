@@ -1,5 +1,7 @@
 # The5Outliers - *Wikispeedia Voyages*: Why so many people use World Regions to reach their target.
 
+You can look at our website [here](https://yannickdetrois.github.io/epfl-ada-datastory/).
+To ensure better compatibility please use Chrome.
 
 <h2 style= "color: #c7c9cf"> Abstract </h2> 
 
