@@ -1539,6 +1539,9 @@ def plot_difficulties_voyage (df_finished, df_unfinished, palette_category_dict)
         ),
         row=1, col=1
     )
+    _, p_value = stats.ttest_ind(df_voyage_duration["durationInSec"].dropna(), df_non_voyage_duration["durationInSec"].dropna())
+    fig.add_annotation(x=1, y= df_voyage_duration["durationInSec"].max() + 50, text=convert_pvalue_to_asterisks(p_value), showarrow=False, font=dict(color='black'))
+    fig = custom_legend_pval(fig, title = False, y_pos = 0.8, x_pos = 1.03, id = 0.02)
 
     # Axis labels
     fig.update_yaxes(title_text="Duration (seconds)", row=1, col=1)
@@ -1645,11 +1648,11 @@ def plot_difficulties_voyage (df_finished, df_unfinished, palette_category_dict)
         height=1000, width=1000,  # Adjust size of the overall figure
         title="Summary of Voyage and Non-Voyage Game Metrics",
         showlegend=True,
-        legend_title="Legend",
+        legend_title="",
         xaxis_title="Game Type",
         yaxis_title="Count/Percentage",
         violingap=0.4, 
-        violinmode="overlay"
+        violinmode="overlay",
     )
 
     fig.show()
@@ -1763,8 +1766,9 @@ def annotate_pvalues_combinaison(fig, p_values, x_labels, bar_positions, bar_hei
         elif annotation == "top" :
             fig.add_annotation(x=x2+0.1, y= max_height + 0.07, text=convert_pvalue_to_asterisks(p_value), showarrow=False, font=dict(color='black'))
 
-def custom_legend_pval(fig, title = True, y_pos = 0.5, x_pos = 1.02):
+def custom_legend_pval(fig, title = True, y_pos = 0.5, x_pos = 1.02, id = 0.05):
     p_value_labels = [
+        "****: p-value < 0.0001",
         "***: p-value < 0.001",
         "**: p-value < 0.01",
         "*: p-value < 0.05",
@@ -1786,7 +1790,7 @@ def custom_legend_pval(fig, title = True, y_pos = 0.5, x_pos = 1.02):
     for i, label in enumerate(p_value_labels):
         fig.add_annotation(
             x=x_pos,  # Position outside the plot area
-            y= y_pos - i * 0.05,  # Adjust spacing between labels
+            y= y_pos - i * id,  # Adjust spacing between labels
             text=label,
             showarrow=False,
             xanchor="left",
