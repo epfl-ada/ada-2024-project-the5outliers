@@ -1719,6 +1719,85 @@ def find_category_position_articles(parser, df_categories, categories_others) :
         link_per_cat[category] = mean_link_position_per_category(parser, df_categories, category=category)
     return link_per_cat
 
+
+import scipy.stats as stats
+
+def convert_pvalue_to_asterisks(pvalue):
+    if pvalue <= 0.0001:
+        return "****"
+    elif pvalue <= 0.001:
+        return "***"
+    elif pvalue <= 0.01:
+        return "**"
+    if pvalue <= 0.05:
+        return "*"
+    return "ns"
+
+
+def perform_ttest(df, model_name1, model_name2):
+    """Performs t-tests and returns p-values for each answer between models"""
+    _, p_value = stats.ttest_ind(df[(df['category'] == model_name1)]["position"].dropna(), df[(df['category'] == model_name2)]["position"].dropna())
+    return p_value 
+
+
+def annotate_pvalues_combinaison(fig, p_values, x_labels, bar_positions, bar_heights, annotation = "line", h = 0.02, combinaison_nb=None):
+    """Annotate p-values on the plot."""
+
+    for i, ((x_label1, x_label2), p_value) in enumerate(p_values.items()):
+        
+        index1 = np.where(x_labels == x_label1)[0][0]
+        index2 = np.where(x_labels == x_label2)[0][0]
+
+        x1 = bar_positions[index1]
+        x2 = bar_positions[index2]
+
+        max_height = max(bar_heights)
+        
+        if annotation == "line" :
+            y = max_height + 0.1 + (i - (index1* combinaison_nb))/15
+            fig.add_shape(type='line', x0=x1, y0=y, x1=x1, y1=y + h, line=dict(color='black'), xref='x', yref='y')
+            fig.add_shape(type='line', x0=x1, y0=y + h, x1=x2, y1=y + h, line=dict(color='black'), xref='x', yref='y')
+            fig.add_shape(type='line', x0=x2, y0=y + h, x1=x2, y1=y, line=dict(color='black'), xref='x', yref='y')
+            
+            fig.add_annotation(x=(x1 + x2) * .5, y= y + h+ 0.02, text=convert_pvalue_to_asterisks(p_value), showarrow=False, font=dict(color='black'))
+        elif annotation == "top" :
+            fig.add_annotation(x=x2+0.1, y= max_height + 0.07, text=convert_pvalue_to_asterisks(p_value), showarrow=False, font=dict(color='black'))
+
+def custom_legend_pval(fig, title = True, y_pos = 0.5, x_pos = 1.02):
+    p_value_labels = [
+        "***: p-value < 0.001",
+        "**: p-value < 0.01",
+        "*: p-value < 0.05",
+        "ns: p-value >= 0.05"
+    ]
+    
+    if title : 
+        fig.add_annotation(
+                x=x_pos,  # Position outside the plot area
+                y= y_pos + 0.1,
+                text="T-test P-values:",
+                showarrow=False,
+                xanchor="left",
+                xref="paper",
+                yref="paper",
+                align="left",
+                font=dict(size=13, color="black"),
+            )
+    for i, label in enumerate(p_value_labels):
+        fig.add_annotation(
+            x=x_pos,  # Position outside the plot area
+            y= y_pos - i * 0.05,  # Adjust spacing between labels
+            text=label,
+            showarrow=False,
+            xanchor="left",
+            xref="paper",
+            yref="paper",
+            align="left",
+            font=dict(size=12, color="black"),
+        )
+    return fig
+    
+
 def plot_comparison_category_click_position(df_merged, df_category_position, colors = {'Clicked Link Position in Paths': '#AFD2E9', 'Article Link Position in Articles': '#9A7197'}):
     df_merged["category"] = "All"
     df_merged["Legend :"] = "Clicked Link Position in Paths"
@@ -1728,13 +1807,33 @@ def plot_comparison_category_click_position(df_merged, df_category_position, col
 
     fig = px.box(df_comparison_path_category, x="category", y="position", color="Legend :", title="Position of the clicked link in articles compared to position of each category in articles", color_discrete_map=colors)
     fig.update_xaxes(tickangle=45)
+    
+    categories_name = df_comparison_path_category['category'].unique()
+
+    p_values = {}
+    for i in range(len(categories_name)):
+        if categories_name[i] != "All":
+            p_values[("All", categories_name[i])] = perform_ttest(df_comparison_path_category, "All", categories_name[i])   
+    
+    bar_pos = np.arange(len(categories_name)) + 0.17 # add 0.17 = the space between the 2 color categories
+    bar_pos[0] -= 0.34
+    bar_h= np.ones(len(categories_name))
+    annotate_pvalues_combinaison(fig, p_values, categories_name,  bar_positions = bar_pos, bar_heights = bar_h, combinaison_nb = len(p_values.keys()), annotation = "top")
+    fig = custom_legend_pval(fig)
 
     fig.update_layout(
         autosize=False,
         width=1500,
         height=500,
         boxgroupgap=0.2, # update
-        boxgap=0)
+        boxgap=0,
+        xaxis=dict(
+        title="Category",
+        # tickvals=[-0.25, 1.25, 2.25]
+        ),
+        yaxis=dict(
+        title="Position",
+        ),)
     fig.show()
 
 def plot_donut_link_position(df_merged, colors):
