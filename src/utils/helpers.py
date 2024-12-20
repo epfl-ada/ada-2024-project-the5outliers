@@ -1801,11 +1801,11 @@ def custom_legend_pval(fig, title = True, y_pos = 0.5, x_pos = 1.02, id = 0.05):
     return fig
     
 
-def plot_comparison_category_click_position(df_merged, df_category_position, colors = {'Clicked Link Position in Paths': '#AFD2E9', 'Article Link Position in Articles': '#9A7197'}):
+def plot_comparison_category_click_position(df_merged, df_category_position, colors = {'Clicked Link Position': '#AFD2E9', "Link Position to a category": '#9A7197'}):
     df_merged["category"] = "All"
-    df_merged["Legend :"] = "Clicked Link Position in Paths"
+    df_merged["Legend :"] = "Clicked Link Position"
     df_melted = pd.melt(df_category_position, var_name='category', value_name='position').dropna()
-    df_melted["Legend :"] = "Article Link Position in Articles"
+    df_melted["Legend :"] = "Link Position to a category"
     df_comparison_path_category = pd.concat([df_merged[["category", "position", "Legend :"]], df_melted])
 
     fig = px.box(df_comparison_path_category, x="category", y="position", color="Legend :", title="Position of the clicked link in articles compared to position of each category in articles", color_discrete_map=colors)
@@ -1882,6 +1882,6 @@ def plot_donut_link_position(df_merged, colors):
             showlegend=True)
     ]
         
-    figure=go.Figure(data=data, layout={'title':'Mean distribution of link positions across all articles in all paths <br>compared to the mean distribution of clicked link positions in all paths.', 'width': 800, 'height': 600})
+    figure=go.Figure(data=data, layout={'title':'Comparison of Mean Link Positions in Articles <br>and the Clicks Positions in All Paths', 'width': 800, 'height': 600})
 
     figure.show()
