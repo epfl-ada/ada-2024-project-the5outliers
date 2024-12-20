@@ -30,7 +30,7 @@ Modelling the influence of the network structure that could inherently bias user
 To compare with the user paths, we can count the number of transitions at every step and regroup them in a matrix P. To see the deviation with the random path we use the Kullback–Leibler ($KL$) divergence, defined element-wise as 
 
 $$
-D_{KL}(P || Q)\_{ij} P_{ij} \log \frac{P_{ij}}{Q_{ij}}
+D_{KL}(P || Q)\_{ij} = P_{ij} \log \frac{P_{ij}}{Q_{ij}}
 $$
 
 
