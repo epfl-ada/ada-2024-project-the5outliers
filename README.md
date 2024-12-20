@@ -34,7 +34,7 @@ D_{KL}(P || Q)\_{ij} = P_{ij} \log \frac{P_{ij}}{Q_{ij}}
 $$
 
 
-if $P_{ij} > 0$ and $Q_{ij} > 0$ and $0$ otherwise.
+if $P_{ij} > 0$ and $Q_{ij} > 0$ and $0$ otherwise. Higher divergence means that users deviate from the random probabilities.
 
 
 <h3 style= "color: #c7c9cf"> Difficulty Metrics </h3>
