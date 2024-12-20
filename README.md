@@ -17,7 +17,7 @@ Our results show that World Regions articles are highly connected, with a dense 
 <h2 style= "color: #c7c9cf"> Methods </h2> 
 
 <h3 style= "color: #c7c9cf"> HTML parsing </h3>
-Parsing allows to find interesting features of the wikipedia articles: the number of words and the total number of links,taking in acount duplicates inside the same page. It also gives structural information about the pages: categories, subcategories, the presence and nature of tables. For each of these structures, the number of words and the list of present links is reported. 
+Parsing allows to find interesting features of the wikipedia articles: the number of words and the total number of links, taking in acount duplicates inside the same page. It also gives structural information about the pages: categories, subcategories, the presence and nature of tables. For each of these structures, the number of words and the list of present links is reported. 
 
 <h3 style= "color: #c7c9cf"> Networks and Graphs </h3>
 Optimal (shortest) paths are determined by modeling the Wikispeedia article network as a directed graph, where nodes represent articles and edges represent hyperlinks between them. For each source-target pair present in the users' games, we compute all shortest paths, ensuring that every minimum-length route is considered.
