@@ -31,6 +31,8 @@ To compare with the user paths, we can count the number of transitions at every 
 
 $$D_{KL}(P || Q)_{ij} = P_{ij}  \log \frac{P_{ij}}{Q_{ij}}$$
 
+$$S_C(a_1, a_2)=\frac{a_1 \cdot a_2}{||a_1|| \cdot ||a_2||}$$
+
 if $P_{ij} > 0$ and $Q_{ij} > 0$ and $0$ otherwise.
 
 
