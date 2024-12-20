@@ -27,7 +27,7 @@ Optimal (shortest) paths are determined by modeling the Wikispeedia article netw
 
 Markov Chains are used to model the influence of the network structure that could inherently bias user paths. Every article is assigned transition probabilities to all other articles based on the number of links present in this article. The transition matrix's $Q$ normalised left eigenvector with eigenvalue $1$ (i.e. $x$ such that $xQ=x$) gives the steady-state of the system (useful to find central articles of the network). 
 
-To compare with the user paths, we can count the number of transitions at every step and regroup them in a matrix P. To see the deviation with the random path we use the Kullback–Leibler ($KL$) divergence, defined element-wise as 
+To compare with the user paths, we can count the number of transitions at every step and regroup them in a matrix $P$. To see the deviation with the random path we use the Kullback–Leibler ($KL$) divergence, defined element-wise as 
 
 $$
 D_{KL}(P || Q)\_{ij} = P_{ij} \log \frac{P_{ij}}{Q_{ij}}
