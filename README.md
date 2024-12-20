@@ -66,7 +66,7 @@ Camille Challier: Difficulty metrics, page structure analysis, and random path c
 
 Yannick Detrois: HTMLParser, Website Design and Redaction, Markov Chains, Similarity along paths
 
-David Friou: Data preprocessing, handling category articles, working on networks, and proper connection and functionality of the entire code.
+David Friou: Data preprocessing, handling category articles, Users and Structure Networks, and proper connection and functionality of the code.
 
 Marine Ract: User Networks, Markov chains, Sankey plots, Website Design.
 
@@ -107,5 +107,6 @@ The directory structure of our project looks like this:
 │
 ├── .gitignore                  <- List of files ignored by git
 ├── requirements.yml            <- File for installing python dependencies
+├── config.py                   <- File with the colors dictionary and abbreviations
 └── README.md
 ```
