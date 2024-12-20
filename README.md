@@ -29,9 +29,10 @@ Modelling the influence of the network structure that could inherently bias user
 
 To compare with the user paths, we can count the number of transitions at every step and regroup them in a matrix P. To see the deviation with the random path we use the Kullback–Leibler ($KL$) divergence, defined element-wise as 
 
-$$D_{KL}(P || Q)_{ij} = P_{ij}  \log \frac{P_{ij}}{Q_{ij}}$$
+$$
+D_{KL}(P \,||\, Q)_{ij} = P_{ij} \log \frac{P_{ij}}{Q_{ij}}
+$$
 
-$$S_C(a_1, a_2)=\frac{a_1 \cdot a_2}{||a_1|| \cdot ||a_2||}$$
 
 if $P_{ij} > 0$ and $Q_{ij} > 0$ and $0$ otherwise.
 
@@ -46,8 +47,6 @@ The distributions of game duration, path length, back-clicks and ratings for bot
 The semantic similarity matrices are computed in a few different ways. One way is to compute them directly through the article names using BGEM3<sup>1</sup> and BERT as embedding model. The similarity between two articles with embedded name vectors a<sub>1</sub> and a<sub>2</sub> is defined as the cosine similarity 
 
 $$S_C(a_1, a_2)=\frac{a_1 \cdot a_2}{||a_1|| \cdot ||a_2||}$$
-
-$$D_{KL}(P || Q)_{ij} = P_{ij}  \log \frac{P_{ij}}{Q_{ij}}$$
 
 <h3 style= "color: #c7c9cf"> Assignment of methods to research questions </h3>
 
